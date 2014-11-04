@@ -24,28 +24,28 @@
 //! The protocol specification is defined in
 //! [BinaryProtocolRevamped](https://code.google.com/p/memcached/wiki/BinaryProtocolRevamped)
 //!
-//! General format of a packet:
-//!
-//!      Byte/     0       |       1       |       2       |       3       |
-//!         /              |               |               |               |
-//!        |0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|
-//!        +---------------+---------------+---------------+---------------+
-//!       0/ HEADER                                                        /
-//!        /                                                               /
-//!        /                                                               /
-//!        /                                                               /
-//!        +---------------+---------------+---------------+---------------+
-//!      24/ COMMAND-SPECIFIC EXTRAS (as needed)                           /
-//!       +/  (note length in the extras length header field)              /
-//!        +---------------+---------------+---------------+---------------+
-//!       m/ Key (as needed)                                               /
-//!       +/  (note length in key length header field)                     /
-//!        +---------------+---------------+---------------+---------------+
-//!       n/ Value (as needed)                                             /
-//!       +/  (note length is total body length header field, minus        /
-//!       +/   sum of the extras and key length body fields)               /
-//!        +---------------+---------------+---------------+---------------+
-//!        Total 24 bytes
+// General format of a packet:
+//
+// Byte/     0       |       1       |       2       |       3       |
+//    /              |               |               |               |
+//   |0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|
+//   +---------------+---------------+---------------+---------------+
+//   0/ HEADER                                                        /
+//   /                                                               /
+//   /                                                               /
+//   /                                                               /
+//   +---------------+---------------+---------------+---------------+
+//   24/ COMMAND-SPECIFIC EXTRAS (as needed)                           /
+//   +/  (note length in the extras length header field)              /
+//   +---------------+---------------+---------------+---------------+
+//   m/ Key (as needed)                                               /
+//   +/  (note length in key length header field)                     /
+//   +---------------+---------------+---------------+---------------+
+//   n/ Value (as needed)                                             /
+//   +/  (note length is total body length header field, minus        /
+//   +/   sum of the extras and key length body fields)               /
+//   +---------------+---------------+---------------+---------------+
+//   Total 24 bytes
 
 use std::io::{Writer, Reader, IoResult, IoError, OtherIoError};
 
@@ -130,6 +130,7 @@ pub const OPCODE_TAP_CHECKPOINT_END: u8 = 0x47;
 
 pub const DATA_TYPE_RAW_BYTES: u8 = 0x00;
 
+#[deriving(Clone, Show, Eq, PartialEq)]
 pub enum Status {
     NoError,
     KeyNotFound,
@@ -194,6 +195,7 @@ impl Status {
     }
 }
 
+#[deriving(Clone, Show, Eq, PartialEq)]
 pub enum Command {
     Get,
     Set,
@@ -384,6 +386,7 @@ impl Command {
     }
 }
 
+#[deriving(Clone, Show, Eq, PartialEq)]
 pub enum DataType {
     RawBytes,
 }
@@ -403,26 +406,27 @@ impl DataType {
     }
 }
 
-//       Byte/     0       |       1       |       2       |       3       |
-//          /              |               |               |               |
-//         |0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|
-//         +---------------+---------------+---------------+---------------+
-//        0| Magic         | Opcode        | Key length                    |
-//         +---------------+---------------+---------------+---------------+
-//        4| Extras length | Data type     | vbucket id                    |
-//         +---------------+---------------+---------------+---------------+
-//        8| Total body length                                             |
-//         +---------------+---------------+---------------+---------------+
-//       12| Opaque                                                        |
-//         +---------------+---------------+---------------+---------------+
-//       16| CAS                                                           |
-//         |                                                               |
-//         +---------------+---------------+---------------+---------------+
-//         Total 24 bytes
-pub struct RequestHeaderType {
+// Byte/     0       |       1       |       2       |       3       |
+//    /              |               |               |               |
+//   |0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|
+//   +---------------+---------------+---------------+---------------+
+//  0| Magic         | Opcode        | Key length                    |
+//   +---------------+---------------+---------------+---------------+
+//  4| Extras length | Data type     | vbucket id                    |
+//   +---------------+---------------+---------------+---------------+
+//  8| Total body length                                             |
+//   +---------------+---------------+---------------+---------------+
+// 12| Opaque                                                        |
+//   +---------------+---------------+---------------+---------------+
+// 16| CAS                                                           |
+//   |                                                               |
+//   +---------------+---------------+---------------+---------------+
+//   Total 24 bytes
+#[deriving(Clone, Show)]
+pub struct RequestHeader {
     pub command: Command,
     key_len: u16,
-    extra_len: u16,
+    extra_len: u8,
     pub data_type: DataType,
     pub vbucket_id: u16,
     body_len: u32,
@@ -430,26 +434,81 @@ pub struct RequestHeaderType {
     pub cas: u64,
 }
 
-//      Byte/     0       |       1       |       2       |       3       |
-//         /              |               |               |               |
-//        |0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|
-//        +---------------+---------------+---------------+---------------+
-//       0| Magic         | Opcode        | Key Length                    |
-//        +---------------+---------------+---------------+---------------+
-//       4| Extras length | Data type     | Status                        |
-//        +---------------+---------------+---------------+---------------+
-//       8| Total body length                                             |
-//        +---------------+---------------+---------------+---------------+
-//      12| Opaque                                                        |
-//        +---------------+---------------+---------------+---------------+
-//      16| CAS                                                           |
-//        |                                                               |
-//        +---------------+---------------+---------------+---------------+
-//        Total 24 bytes
-pub struct ResponseHeaderType {
+impl RequestHeader {
+    pub fn new(cmd: Command, dtype: DataType, vbid: u16, opaque: u32, cas: u64) -> RequestHeader {
+        RequestHeader {
+            command: cmd,
+            key_len: 0,
+            extra_len: 0,
+            data_type: dtype,
+            vbucket_id: vbid,
+            body_len: 0,
+            opaque: opaque,
+            cas: cas,
+        }
+    }
+
+    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
+        try!(writer.write_u8(MAGIC_REQUEST));
+        try!(writer.write_u8(self.command.code()));
+        try!(writer.write_be_u16(self.key_len));
+        try!(writer.write_u8(self.extra_len));
+        try!(writer.write_u8(self.data_type.code()));
+        try!(writer.write_be_u16(self.vbucket_id));
+        try!(writer.write_be_u32(self.body_len));
+        try!(writer.write_be_u32(self.opaque));
+        try!(writer.write_be_u64(self.cas));
+
+        Ok(())
+    }
+
+    pub fn read_from(reader: &mut Reader) -> IoResult<RequestHeader> {
+        let magic = try!(reader.read_u8());
+
+        if magic != MAGIC_REQUEST {
+            return Err(make_io_error("Invalid magic", None));
+        }
+
+        Ok(RequestHeader {
+            command: match Command::from_code(try!(reader.read_u8())) {
+                Some(c) => c,
+                None => return Err(make_io_error("Invalid command", None)),
+            },
+            key_len: try!(reader.read_be_u16()),
+            extra_len: try!(reader.read_u8()),
+            data_type: match DataType::from_code(try!(reader.read_u8())) {
+                Some(d) => d,
+                None => return Err(make_io_error("Invalid data type", None))
+            },
+            vbucket_id: try!(reader.read_be_u16()),
+            body_len: try!(reader.read_be_u32()),
+            opaque: try!(reader.read_be_u32()),
+            cas: try!(reader.read_be_u64()),
+        })
+    }
+}
+
+// Byte/     0       |       1       |       2       |       3       |
+//    /              |               |               |               |
+//   |0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|
+//   +---------------+---------------+---------------+---------------+
+//  0| Magic         | Opcode        | Key Length                    |
+//   +---------------+---------------+---------------+---------------+
+//  4| Extras length | Data type     | Status                        |
+//   +---------------+---------------+---------------+---------------+
+//  8| Total body length                                             |
+//   +---------------+---------------+---------------+---------------+
+// 12| Opaque                                                        |
+//   +---------------+---------------+---------------+---------------+
+// 16| CAS                                                           |
+//   |                                                               |
+//   +---------------+---------------+---------------+---------------+
+//   Total 24 bytes
+#[deriving(Clone, Show)]
+pub struct ResponseHeader {
     pub command: Command,
     key_len: u16,
-    extra_len: u16,
+    extra_len: u8,
     pub data_type: DataType,
     pub status: Status,
     body_len: u32,
@@ -457,114 +516,85 @@ pub struct ResponseHeaderType {
     pub cas: u64,
 }
 
-pub enum Header {
-    RequestHeader(RequestHeaderType),
-    ResponseHeader(ResponseHeaderType),
-}
-
-impl Header {
-    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
-        match self {
-            &RequestHeader(ref req) => {
-                try!(writer.write_u8(MAGIC_REQUEST));
-                try!(writer.write_u8(req.command.code()));
-                try!(writer.write_be_u16(req.key_len));
-                try!(writer.write_be_u16(req.extra_len));
-                try!(writer.write_u8(req.data_type.code()));
-                try!(writer.write_be_u16(req.vbucket_id));
-                try!(writer.write_be_u32(req.body_len));
-                try!(writer.write_be_u32(req.opaque));
-                try!(writer.write_be_u64(req.cas));
-            },
-            &ResponseHeader(ref resp) => {
-                try!(writer.write_u8(MAGIC_RESPONSE));
-                try!(writer.write_u8(resp.command.code()));
-                try!(writer.write_be_u16(resp.key_len));
-                try!(writer.write_be_u16(resp.extra_len));
-                try!(writer.write_u8(resp.data_type.code()));
-                try!(writer.write_be_u16(resp.status.code()));
-                try!(writer.write_be_u32(resp.body_len));
-                try!(writer.write_be_u32(resp.opaque));
-                try!(writer.write_be_u64(resp.cas));
-            }
+impl ResponseHeader {
+    pub fn new(cmd: Command, dtype: DataType, status: Status, opaque: u32, cas: u64) -> ResponseHeader {
+        ResponseHeader {
+            command: cmd,
+            key_len: 0,
+            extra_len: 0,
+            data_type: dtype,
+            status: status,
+            body_len: 0,
+            opaque: opaque,
+            cas: cas,
         }
+    }
+
+    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
+        try!(writer.write_u8(MAGIC_RESPONSE));
+        try!(writer.write_u8(self.command.code()));
+        try!(writer.write_be_u16(self.key_len));
+        try!(writer.write_u8(self.extra_len));
+        try!(writer.write_u8(self.data_type.code()));
+        try!(writer.write_be_u16(self.status.code()));
+        try!(writer.write_be_u32(self.body_len));
+        try!(writer.write_be_u32(self.opaque));
+        try!(writer.write_be_u64(self.cas));
 
         Ok(())
     }
 
-    pub fn read_from(reader: &mut Reader) -> IoResult<Header> {
+    pub fn read_from(reader: &mut Reader) -> IoResult<ResponseHeader> {
         let magic = try!(reader.read_u8());
-        match magic {
-            MAGIC_REQUEST => {
-                Ok(RequestHeader(RequestHeaderType {
-                    command: match Command::from_code(try!(reader.read_u8())) {
-                        Some(c) => c,
-                        None => return Err(make_io_error("Invalid command", None)),
-                    },
-                    key_len: try!(reader.read_be_u16()),
-                    extra_len: try!(reader.read_be_u16()),
-                    data_type: match DataType::from_code(try!(reader.read_u8())) {
-                        Some(d) => d,
-                        None => return Err(make_io_error("Invalid data type", None))
-                    },
-                    vbucket_id: try!(reader.read_be_u16()),
-                    body_len: try!(reader.read_be_u32()),
-                    opaque: try!(reader.read_be_u32()),
-                    cas: try!(reader.read_be_u64()),
-                }))
-            }
-            MAGIC_RESPONSE => {
-                Ok(ResponseHeader(ResponseHeaderType {
-                    command: match Command::from_code(try!(reader.read_u8())) {
-                        Some(c) => c,
-                        None => return Err(make_io_error("Invalid command", None)),
-                    },
-                    key_len: try!(reader.read_be_u16()),
-                    extra_len: try!(reader.read_be_u16()),
-                    data_type: match DataType::from_code(try!(reader.read_u8())) {
-                        Some(d) => d,
-                        None => return Err(make_io_error("Invalid data type", None))
-                    },
-                    status: match Status::from_code(try!(reader.read_be_u16())) {
-                        Some(s) => s,
-                        None => return Err(make_io_error("Invalid status", None)),
-                    },
-                    body_len: try!(reader.read_be_u32()),
-                    opaque: try!(reader.read_be_u32()),
-                    cas: try!(reader.read_be_u64()),
-                }))
-            }
-            _ => {
-                Err(make_io_error(
-                        "Invalid magic",
-                        Some(format!("Magic code should be either {} or {}, but got {}",
-                                     MAGIC_REQUEST, MAGIC_RESPONSE, magic))))
-            }
+
+        if magic != MAGIC_RESPONSE {
+            return Err(make_io_error("Invalid magic", None));
         }
+
+        Ok(ResponseHeader {
+            command: match Command::from_code(try!(reader.read_u8())) {
+                Some(c) => c,
+                None => return Err(make_io_error("Invalid command", None)),
+            },
+            key_len: try!(reader.read_be_u16()),
+            extra_len: try!(reader.read_u8()),
+            data_type: match DataType::from_code(try!(reader.read_u8())) {
+                Some(d) => d,
+                None => return Err(make_io_error("Invalid data type", None))
+            },
+            status: match Status::from_code(try!(reader.read_be_u16())) {
+                Some(s) => s,
+                None => return Err(make_io_error("Invalid status", None)),
+            },
+            body_len: try!(reader.read_be_u32()),
+            opaque: try!(reader.read_be_u32()),
+            cas: try!(reader.read_be_u64()),
+        })
     }
 }
 
-pub struct Packet {
-    pub header: Header,
+#[deriving(Clone, Show)]
+pub struct RequestPacket {
+    pub header: RequestHeader,
     pub extra: Vec<u8>,
     pub key: Vec<u8>,
     pub value: Vec<u8>,
 }
 
-impl Packet {
-    pub fn write_to(&mut self, writer: &mut Writer) -> IoResult<()> {
-        match self.header {
-            RequestHeader(ref mut req) => {
-                req.key_len = self.key.len() as u16;
-                req.extra_len = self.extra.len() as u16;
-                req.body_len = (self.key.len() + self.extra.len() + self.value.len()) as u32;
-            },
-            ResponseHeader(ref mut resp) => {
-                resp.key_len = self.key.len() as u16;
-                resp.extra_len = self.extra.len() as u16;
-                resp.body_len = (self.key.len() + self.extra.len() + self.value.len()) as u32;
-            }
+impl RequestPacket {
+    pub fn new(header: RequestHeader, extra: Vec<u8>, key: Vec<u8>, value: Vec<u8>) -> RequestPacket {
+        RequestPacket {
+            header: header,
+            extra: extra,
+            key: key,
+            value: value,
         }
+    }
+
+    pub fn write_to(&mut self, writer: &mut Writer) -> IoResult<()> {
+        self.header.key_len = self.key.len() as u16;
+        self.header.extra_len = self.extra.len() as u8;
+        self.header.body_len = (self.key.len() + self.extra.len() + self.value.len()) as u32;
 
         try!(self.header.write_to(writer));
         try!(writer.write(self.extra.as_slice()));
@@ -574,22 +604,60 @@ impl Packet {
         Ok(())
     }
 
-    pub fn read_from(reader: &mut Reader) -> IoResult<Packet> {
-        let header = try!(Header::read_from(reader));
+    pub fn read_from(reader: &mut Reader) -> IoResult<RequestPacket> {
+        let header = try!(RequestHeader::read_from(reader));
 
-        let (extra_len, key_len, value_len) = match header {
-            RequestHeader(ref req) => (req.extra_len as uint,
-                                       req.key_len as uint,
-                                       req.body_len as uint - req.extra_len as uint - req.key_len as uint),
-            ResponseHeader(ref resp) => (resp.extra_len as uint,
-                                         resp.key_len as uint,
-                                         resp.body_len as uint - resp.extra_len as uint - resp.key_len as uint)
-        };
+        let value_len = header.body_len as uint - header.extra_len as uint - header.key_len as uint;
 
-        Ok(Packet {
+        Ok(RequestPacket {
             header: header,
-            extra: try!(reader.read_exact(extra_len)),
-            key: try!(reader.read_exact(key_len)),
+            extra: try!(reader.read_exact(header.extra_len as uint)),
+            key: try!(reader.read_exact(header.key_len as uint)),
+            value: try!(reader.read_exact(value_len)),
+        })
+    }
+}
+
+#[deriving(Clone, Show)]
+pub struct ResponsePacket {
+    pub header: ResponseHeader,
+    pub extra: Vec<u8>,
+    pub key: Vec<u8>,
+    pub value: Vec<u8>,
+}
+
+impl ResponsePacket {
+    pub fn new(header: ResponseHeader, extra: Vec<u8>, key: Vec<u8>, value: Vec<u8>) -> ResponsePacket {
+        ResponsePacket {
+            header: header,
+            extra: extra,
+            key: key,
+            value: value,
+        }
+    }
+
+    pub fn write_to(&mut self, writer: &mut Writer) -> IoResult<()> {
+        self.header.key_len = self.key.len() as u16;
+        self.header.extra_len = self.extra.len() as u8;
+        self.header.body_len = (self.key.len() + self.extra.len() + self.value.len()) as u32;
+
+        try!(self.header.write_to(writer));
+        try!(writer.write(self.extra.as_slice()));
+        try!(writer.write(self.key.as_slice()));
+        try!(writer.write(self.value.as_slice()));
+
+        Ok(())
+    }
+
+    pub fn read_from(reader: &mut Reader) -> IoResult<ResponsePacket> {
+        let header = try!(ResponseHeader::read_from(reader));
+
+        let value_len = header.body_len as uint - header.extra_len as uint - header.key_len as uint;
+
+        Ok(ResponsePacket {
+            header: header,
+            extra: try!(reader.read_exact(header.extra_len as uint)),
+            key: try!(reader.read_exact(header.key_len as uint)),
             value: try!(reader.read_exact(value_len)),
         })
     }
@@ -600,5 +668,70 @@ fn make_io_error(desc: &'static str, detail: Option<String>) -> IoError {
         kind: OtherIoError,
         desc: desc,
         detail: detail,
+    }
+}
+
+mod test {
+    use std::io::net::tcp::TcpStream;
+    use std::io::BufferedStream;
+
+    use proto::binary;
+
+    fn test_stream() -> TcpStream {
+        TcpStream::connect("127.0.0.1", 11211).unwrap()
+    }
+
+    #[test]
+    fn test_set_get_del() {
+        let mut stream = BufferedStream::new(test_stream());
+
+        {
+            let req_header = binary::RequestHeader::new(binary::Set, binary::RawBytes, 0, 0, 0);
+            let mut req_packet = binary::RequestPacket::new(
+                                req_header,
+                                vec![0xde, 0xad, 0xbe, 0xef, 0x00, 0x00, 0x0e, 0x10],
+                                b"hello".to_vec(),
+                                b"world".to_vec());
+
+            req_packet.write_to(&mut stream).unwrap();
+            stream.flush().unwrap();
+
+            let resp_packet = binary::ResponsePacket::read_from(&mut stream).unwrap();
+
+            assert!(resp_packet.header.status == binary::NoError);
+        }
+
+        {
+            let req_header = binary::RequestHeader::new(binary::Get, binary::RawBytes, 0, 0, 0);
+            let mut req_packet = binary::RequestPacket::new(
+                                req_header,
+                                vec![],
+                                b"hello".to_vec(),
+                                vec![]);
+
+            req_packet.write_to(&mut stream).unwrap();
+            stream.flush().unwrap();
+
+            let resp_packet = binary::ResponsePacket::read_from(&mut stream).unwrap();
+
+            assert!(resp_packet.header.status == binary::NoError);
+            assert_eq!(resp_packet.value.as_slice(), b"world");
+        }
+
+        {
+            let req_header = binary::RequestHeader::new(binary::Delete, binary::RawBytes, 0, 0, 0);
+            let mut req_packet = binary::RequestPacket::new(
+                                req_header,
+                                vec![],
+                                b"hello".to_vec(),
+                                vec![]);
+
+            req_packet.write_to(&mut stream).unwrap();
+            stream.flush().unwrap();
+
+            let resp_packet = binary::ResponsePacket::read_from(&mut stream).unwrap();
+
+            assert!(resp_packet.header.status == binary::NoError);
+        }
     }
 }

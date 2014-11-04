@@ -19,4 +19,19 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+use std::time::duration::Duration;
+
 pub mod binary;
+
+pub struct Error {
+    pub desc: &'static str,
+    pub detail: Option<String>,
+}
+
+pub trait Proto {
+    fn set(&self, key: &[u8], value: &[u8], flags: u32, expiration: Duration) -> Result<(), Error>;
+    fn add(&self, key: &[u8], value: &[u8], flags: u32, expiration: Duration) -> Result<(), Error>;
+    fn replace(&self, key: &[u8], value: &[u8], flags: u32, expiration: Duration) -> Result<(), Error>;
+    fn get(&self, key: &[u8]) -> Result<Vec<u8>, Error>;
+    fn getk(&self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Error>;
+}

@@ -25,4 +25,9 @@
 #![crate_name = "memcached"]
 #![desc = "Memcached client in Rust"]
 
+#![feature(phase)]
+
+#[phase(plugin, link)]
+extern crate log;
+
 pub mod proto;
