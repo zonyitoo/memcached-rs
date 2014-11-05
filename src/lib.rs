@@ -33,3 +33,4 @@ extern crate log;
 
 pub mod proto;
 pub mod version;
+pub mod client;

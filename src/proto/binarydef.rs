@@ -51,6 +51,8 @@
 
 use std::io::{Writer, Reader, IoResult, IoError, OtherIoError};
 
+use proto::Status;
+
 pub const MAGIC_REQUEST: u8 = 0x80;
 pub const MAGIC_RESPONSE: u8 = 0x81;
 
@@ -131,92 +133,6 @@ pub const OPCODE_TAP_CHECKPOINT_START: u8 = 0x46;
 pub const OPCODE_TAP_CHECKPOINT_END: u8 = 0x47;
 
 pub const DATA_TYPE_RAW_BYTES: u8 = 0x00;
-
-#[deriving(Clone, Show, Eq, PartialEq)]
-pub enum Status {
-    NoError,
-    KeyNotFound,
-    KeyExists,
-    ValueTooLarge,
-    InvalidArguments,
-    ItemNotStored,
-    IncrDecrOnNonNumericValue,
-    VBucketBelongsToOtherServer,
-    AuthenticationError,
-    AuthenticationContinue,
-    UnknownCommand,
-    OutOfMemory,
-    NotSupported,
-    InternalError,
-    Busy,
-    TemporaryFailure,
-}
-
-impl Status {
-    fn code(&self) -> u16 {
-        match *self {
-            NoError => STATUS_NO_ERROR,
-            KeyNotFound => STATUS_KEY_NOT_FOUND,
-            KeyExists => STATUS_KEY_EXISTS,
-            ValueTooLarge => STATUS_VALUE_TOO_LARGE,
-            InvalidArguments => STATUS_INVALID_ARGUMENTS,
-            ItemNotStored => STATUS_ITEM_NOT_STORED,
-            IncrDecrOnNonNumericValue => STATUS_INCR_OR_DECR_ON_NON_NUMERIC_VALUE,
-            VBucketBelongsToOtherServer => STATUS_VBUCKET_BELONGS_TO_OTHER_SERVER,
-            AuthenticationError => STATUS_AUTHENTICATION_ERROR,
-            AuthenticationContinue => STATUS_AUTHENTICATION_CONTINUE,
-            UnknownCommand => STATUS_UNKNOWN_COMMAND,
-            OutOfMemory => STATUS_OUT_OF_MEMORY,
-            NotSupported => STATUS_NOT_SUPPORTED,
-            InternalError => STATUS_INTERNAL_ERROR,
-            Busy => STATUS_BUSY,
-            TemporaryFailure => STATUS_TEMPORARY_FAILURE,
-        }
-    }
-
-    fn from_code(code: u16) -> Option<Status> {
-        match code {
-            STATUS_NO_ERROR => Some(NoError),
-            STATUS_KEY_NOT_FOUND => Some(KeyNotFound),
-            STATUS_KEY_EXISTS => Some(KeyExists),
-            STATUS_VALUE_TOO_LARGE => Some(ValueTooLarge),
-            STATUS_INVALID_ARGUMENTS => Some(InvalidArguments),
-            STATUS_ITEM_NOT_STORED => Some(ItemNotStored),
-            STATUS_INCR_OR_DECR_ON_NON_NUMERIC_VALUE => Some(IncrDecrOnNonNumericValue),
-            STATUS_VBUCKET_BELONGS_TO_OTHER_SERVER => Some(VBucketBelongsToOtherServer),
-            STATUS_AUTHENTICATION_ERROR => Some(AuthenticationError),
-            STATUS_AUTHENTICATION_CONTINUE => Some(AuthenticationContinue),
-            STATUS_UNKNOWN_COMMAND => Some(UnknownCommand),
-            STATUS_OUT_OF_MEMORY => Some(OutOfMemory),
-            STATUS_NOT_SUPPORTED => Some(NotSupported),
-            STATUS_INTERNAL_ERROR => Some(InternalError),
-            STATUS_BUSY => Some(Busy),
-            STATUS_TEMPORARY_FAILURE => Some(TemporaryFailure),
-            _ => None
-        }
-    }
-
-    pub fn desc(&self) -> &'static str {
-        match *self {
-            NoError => "no error",
-            KeyNotFound => "key not found",
-            KeyExists => "key exists",
-            ValueTooLarge => "value too large",
-            InvalidArguments => "invalid argument",
-            ItemNotStored => "item not stored",
-            IncrDecrOnNonNumericValue => "incr or decr on non numeric value",
-            VBucketBelongsToOtherServer => "vbucket belongs to other server",
-            AuthenticationError => "authentication error",
-            AuthenticationContinue => "authentication continue",
-            UnknownCommand => "unknown command",
-            OutOfMemory => "out of memory",
-            NotSupported => "not supported",
-            InternalError => "internal error",
-            Busy => "busy",
-            TemporaryFailure => "temporary failure",
-        }
-    }
-}
 
 #[deriving(Clone, Show, Eq, PartialEq)]
 pub enum Command {
@@ -699,7 +615,7 @@ mod test {
     use std::io::net::tcp::TcpStream;
     use std::io::BufferedStream;
 
-    use proto::binarydef;
+    use proto::{binarydef, mod};
 
     fn test_stream() -> TcpStream {
         TcpStream::connect("127.0.0.1", 11211).unwrap()
@@ -722,7 +638,7 @@ mod test {
 
             let resp_packet = binarydef::ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == binarydef::NoError);
+            assert!(resp_packet.header.status == proto::NoError);
         }
 
         {
@@ -738,7 +654,7 @@ mod test {
 
             let resp_packet = binarydef::ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == binarydef::NoError);
+            assert!(resp_packet.header.status == proto::NoError);
             assert_eq!(resp_packet.value.as_slice(), b"world");
         }
 
@@ -755,7 +671,7 @@ mod test {
 
             let resp_packet = binarydef::ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == binarydef::NoError);
+            assert!(resp_packet.header.status == proto::NoError);
         }
     }
 }
