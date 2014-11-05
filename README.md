@@ -8,10 +8,10 @@ Memcached library in Rust
 extern crate memcached;
 
 use memcached::client::Client;
-use memcached::proto::Binary;
+use memcached::proto::{Operation, Binary};
 
 fn main() {
-    let mut client = Client::connect(["127.0.0.1", 11211, Binary]);
+    let mut client = Client::connect([("127.0.0.1", 11211, Binary)]);
 
     client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
 

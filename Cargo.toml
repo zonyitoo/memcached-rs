@@ -7,3 +7,7 @@ authors = ["Y. T. CHUNG <zonyitoo@gmail.com>"]
 [lib]
 
 name = "memcached"
+
+[dependencies.crc32]
+
+path = "src/crc32"

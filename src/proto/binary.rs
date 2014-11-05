@@ -25,7 +25,7 @@ use std::string::String;
 use std::str;
 use std::collections::TreeMap;
 
-use proto::{Operation, MultiOperation, Error, OtherError, MemCachedError, binarydef, mod};
+use proto::{Operation, MultiOperation, ServerOperation, Error, OtherError, MemCachedError, binarydef, mod};
 use version::Version;
 
 macro_rules! try_response(
@@ -271,6 +271,44 @@ impl Operation for BinaryProto {
         Ok(try_io!(bufr.read_be_u64()))
     }
 
+    fn append(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
+        let req_header = binarydef::RequestHeader::new(binarydef::Append, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                Vec::new(),
+                                key.to_vec(),
+                                value.to_vec());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+
+        try_response!(resp_packet);
+
+        Ok(())
+    }
+
+    fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
+        let req_header = binarydef::RequestHeader::new(binarydef::Prepend, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                Vec::new(),
+                                key.to_vec(),
+                                value.to_vec());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+
+        try_response!(resp_packet);
+
+        Ok(())
+    }
+}
+
+impl ServerOperation for BinaryProto {
     fn quit(&mut self) -> Result<(), Error> {
         let req_header = binarydef::RequestHeader::new(binarydef::Quit, binarydef::RawBytes, 0, 0, 0);
         let mut req_packet = binarydef::RequestPacket::new(
@@ -340,42 +378,6 @@ impl Operation for BinaryProto {
             Some(v) => v,
             None => return Err(Error::new(OtherError, "Unrecognized version string", None)),
         })
-    }
-
-    fn append(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Append, binarydef::RawBytes, 0, 0, 0);
-        let mut req_packet = binarydef::RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                value.to_vec());
-
-        try_io!(req_packet.write_to(&mut self.stream));
-        try_io!(self.stream.flush());
-
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
-        try_response!(resp_packet);
-
-        Ok(())
-    }
-
-    fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Prepend, binarydef::RawBytes, 0, 0, 0);
-        let mut req_packet = binarydef::RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                value.to_vec());
-
-        try_io!(req_packet.write_to(&mut self.stream));
-        try_io!(self.stream.flush());
-
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
-        try_response!(resp_packet);
-
-        Ok(())
     }
 
     fn stat(&mut self) -> Result<TreeMap<String, String>, Error> {
@@ -562,7 +564,7 @@ mod test {
     use std::io::net::ip::Port;
     use std::io::net::tcp::TcpStream;
     use std::collections::TreeMap;
-    use proto::{Operation, MultiOperation, BinaryProto};
+    use proto::{Operation, MultiOperation, ServerOperation, BinaryProto};
 
     const SERVER_ADDR: &'static str = "127.0.0.1";
     const SERVER_PORT: Port = 11211;

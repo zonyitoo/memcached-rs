@@ -22,8 +22,10 @@
 use std::io::net::ip::Port;
 use std::io::net::tcp::TcpStream;
 use std::io::IoResult;
+use std::collections::TreeMap;
 
-use proto::{Proto, mod};
+use proto::{Proto, Operation, Error, mod};
+use version;
 
 struct Server {
     pub proto: Box<Proto + Send>,
@@ -42,6 +44,19 @@ impl Server {
     }
 }
 
+/// Memcached client
+///
+/// ```no_run
+/// use memcached::client::Client;
+/// use memcached::proto::{Operation, Binary};
+///
+/// let mut client = Client::connect([("127.0.0.1", 11211, Binary)]);
+/// client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
+/// let (value, flags) = client.get(b"Foo").unwrap();
+///
+/// assert_eq!(value.as_slice(), b"Bar");
+/// assert_eq!(flags, 0xdeadbeef);
+/// ```
 pub struct Client {
     servers: Vec<Server>,
 }
@@ -57,5 +72,47 @@ impl Client {
         Client {
             servers: servers,
         }
+    }
+}
+
+impl Operation for Client {
+    fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        unimplemented!();
+    }
+
+    fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        unimplemented!();
+    }
+
+    fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
+        unimplemented!();
+    }
+
+    fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        unimplemented!();
+    }
+
+    fn get(&mut self, key: &[u8]) -> Result<(Vec<u8>, u32), Error> {
+        unimplemented!();
+    }
+
+    fn getk(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32), Error> {
+        unimplemented!();
+    }
+
+    fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error> {
+        unimplemented!();
+    }
+
+    fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error> {
+        unimplemented!();
+    }
+
+    fn append(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
+        unimplemented!();
+    }
+
+    fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
+        unimplemented!();
     }
 }

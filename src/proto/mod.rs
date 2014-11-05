@@ -153,8 +153,8 @@ impl Show for Error {
     }
 }
 
-pub trait Proto: Operation + MultiOperation {}
-impl<T: Operation + MultiOperation> Proto for T {}
+pub trait Proto: Operation + MultiOperation + ServerOperation {}
+impl<T: Operation + MultiOperation + ServerOperation> Proto for T {}
 
 pub trait Operation {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
@@ -165,12 +165,15 @@ pub trait Operation {
     fn getk(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32), Error>;
     fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error>;
     fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error>;
+    fn append(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
+    fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
+}
+
+pub trait ServerOperation {
     fn quit(&mut self) -> Result<(), Error>;
     fn flush(&mut self, expiration: u32) -> Result<(), Error>;
     fn noop(&mut self) -> Result<(), Error> { Ok(()) }
     fn version(&mut self) -> Result<version::Version, Error>;
-    fn append(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
-    fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
     fn stat(&mut self) -> Result<TreeMap<String, String>, Error>;
 }
 
