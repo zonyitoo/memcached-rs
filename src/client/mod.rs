@@ -26,8 +26,7 @@ use std::collections::TreeMap;
 
 use crc32::Crc32;
 
-use proto::{Proto, Operation, Error, mod};
-use version;
+use proto::{Proto, Operation, MultiOperation, ServerOperation, Error, mod};
 
 struct Server {
     pub proto: Box<Proto + Send>,
@@ -52,40 +51,54 @@ impl Server {
 /// use memcached::client::Client;
 /// use memcached::proto::{Operation, Binary};
 ///
-/// let mut client = Client::connect([("127.0.0.1", 11211, Binary)]);
+/// let mut client = Client::connect([("127.0.0.1", 11211, Binary, 1)]);
 /// client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
 /// let (value, flags) = client.get(b"Foo").unwrap();
 ///
 /// assert_eq!(value.as_slice(), b"Bar");
 /// assert_eq!(flags, 0xdeadbeef);
 /// ```
-pub struct Client {
+pub struct Client<'c> {
     servers: Vec<Server>,
     key_hasher: Crc32,
+    bucket: Vec<uint>,
 }
 
-impl Client {
-    pub fn connect(svrs: &[(&str, Port, proto::ProtoType)]) -> Client {
+impl<'s> Client<'s> {
+    pub fn connect<'s>(svrs: &[(&str, Port, proto::ProtoType, uint)]) -> Client<'s> {
         let mut servers = Vec::new();
-        for &(addr, port, p) in svrs.iter() {
+        let mut bucket = Vec::new();
+        for &(addr, port, p, weight) in svrs.iter() {
             servers.push(Server::connect(addr, port, p).unwrap_or_else(|err| {
                 panic!("Cannot connect server {}:{}: {}", addr, port, err);
             }));
+
+            for _ in range(0, weight) {
+                bucket.push(servers.len() - 1);
+            }
         }
         Client {
             servers: servers,
             key_hasher: Crc32::new(),
+            bucket: bucket,
         }
     }
 
     fn find_server_by_key<'a>(&'a mut self, key: &[u8]) -> &'a mut Server {
         let hash = (self.key_hasher.crc(key) >> 16) & 0x7fff;
-        let idx = (hash as uint) % self.servers.len();
-        &mut self.servers[idx]
+        let idx = (hash as uint) % self.bucket.len();
+        &mut self.servers[self.bucket[idx]]
+    }
+
+    pub fn flush_all(&mut self) -> Result<(), Error> {
+        for s in self.servers.iter_mut() {
+            try!(s.proto.flush(0));
+        }
+        Ok(())
     }
 }
 
-impl Operation for Client {
+impl<'c> Operation for Client<'c> {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
         let server = self.find_server_by_key(key);
         server.proto.set(key, value, flags, expiration)
@@ -134,5 +147,28 @@ impl Operation for Client {
     fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
         let server = self.find_server_by_key(key);
         server.proto.prepend(key, value)
+    }
+
+    fn touch(&mut self, key: &[u8], expiration: u32) -> Result<(), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.touch(key, expiration)
+    }
+}
+
+impl<'c> MultiOperation for Client<'c> {
+    fn set_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<Vec<Result<(), Error>>, Error> {
+        unimplemented!();
+    }
+
+    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Result<(), Error>>, Error> {
+        unimplemented!();
+    }
+
+    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Option<(Vec<u8>, u32)>>, Error> {
+        unimplemented!();
+    }
+
+    fn getk_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Option<(Vec<u8>, Vec<u8>, u32)>>, Error> {
+        unimplemented!();
     }
 }

@@ -167,12 +167,29 @@ pub trait Operation {
     fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error>;
     fn append(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
     fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
+    fn touch(&mut self, key: &[u8], expiration: u32) -> Result<(), Error>;
+}
+
+pub trait CasOperation {
+    fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error>;
+    fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<u64, Error>;
+    fn delete_cas(&mut self, key: &[u8], cas: u64) -> Result<u64, Error>;
+    fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error>;
+    fn get_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, u32, u64), Error>;
+    fn getk_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32, u64), Error>;
+    fn increment_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
+        -> Result<u64, Error>;
+    fn decrement_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
+        -> Result<u64, Error>;
+    fn append_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error>;
+    fn prepend_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error>;
+    fn touch_cas(&mut self, key: &[u8], expiration: u32) -> Result<(), Error>;
 }
 
 pub trait ServerOperation {
     fn quit(&mut self) -> Result<(), Error>;
     fn flush(&mut self, expiration: u32) -> Result<(), Error>;
-    fn noop(&mut self) -> Result<(), Error> { Ok(()) }
+    fn noop(&mut self) -> Result<(), Error>;
     fn version(&mut self) -> Result<version::Version, Error>;
     fn stat(&mut self) -> Result<TreeMap<String, String>, Error>;
 }
@@ -188,4 +205,10 @@ pub trait NoReplyOperation {
     fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
     fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
     fn delete_noreply(&mut self, key: &[u8]) -> Result<(), Error>;
+    fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
+    fn touch_noreply(&mut self, key: &[u8], expiration: u32) -> Result<(), Error>;
+    fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error>;
+    fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error>;
+    fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
+    fn prepend_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
 }

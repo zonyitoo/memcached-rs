@@ -306,6 +306,27 @@ impl Operation for BinaryProto {
 
         Ok(())
     }
+
+    fn touch(&mut self, key: &[u8], expiration: u32) -> Result<(), Error> {
+        let mut extra_buf = MemWriter::with_capacity(4);
+        try_io!(extra_buf.write_be_u32(expiration));
+
+        let req_header = binarydef::RequestHeader::new(binarydef::Touch, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                Vec::new());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+
+        try_response!(resp_packet);
+
+        Ok(())
+    }
 }
 
 impl ServerOperation for BinaryProto {
@@ -722,6 +743,20 @@ mod test {
         let mut client = get_client();
         let stat_resp = client.stat();
         assert!(stat_resp.is_ok());
+    }
+
+    #[test]
+    fn test_touch() {
+        let mut client = get_client();
+
+        let touch_resp = client.touch(b"test:touch", 2);
+        assert!(touch_resp.is_err());
+
+        let add_resp = client.add(b"test:touch", b"val", 0xcafebabe, 1);
+        assert!(add_resp.is_ok());
+
+        let touch_resp = client.touch(b"test:touch", 2);
+        assert!(touch_resp.is_ok());
     }
 
     #[test]

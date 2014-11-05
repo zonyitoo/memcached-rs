@@ -1,5 +1,7 @@
 # memcached-rs
 
+[![Build Status](https://travis-ci.org/zonyitoo/memcached-rs.svg)](https://travis-ci.org/zonyitoo/memcached-rs)
+
 Memcached library in Rust
 
 ## Usage
@@ -11,7 +13,7 @@ use memcached::client::Client;
 use memcached::proto::{Operation, Binary};
 
 fn main() {
-    let mut client = Client::connect([("127.0.0.1", 11211, Binary)]);
+    let mut client = Client::connect([("127.0.0.1", 11211, Binary, 1)]);
 
     client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
 

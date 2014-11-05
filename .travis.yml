@@ -1,0 +1,8 @@
+language: rust
+
+services:
+    - memcached
+
+script:
+    - cargo build -v
+    - cargo test -v
