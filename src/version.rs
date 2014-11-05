@@ -19,17 +19,38 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#![experimental]
-#![license = "MIT"]
-#![crate_type = "lib"]
-#![crate_name = "memcached"]
-#![desc = "Memcached client in Rust"]
+use std::fmt::{Show, Formatter, mod};
+use std::from_str::FromStr;
 
-#![feature(phase)]
-#![feature(macro_rules)]
+pub struct Version(uint, uint, uint);
 
-#[phase(plugin, link)]
-extern crate log;
+impl Version {
+    pub fn new(major: uint, minor: uint, patch: uint) -> Version {
+        Version(major, minor, patch)
+    }
+}
 
-pub mod proto;
-pub mod version;
+impl Show for Version {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let &Version(major, minor, patch) = self;
+        write!(f, "{}:{}:{}", major, minor, patch)
+    }
+}
+
+macro_rules! try_option(
+    ($inp:expr) => (
+        match $inp {
+            Some(v) => { v },
+            None => { return None; },
+        }
+    );
+)
+
+impl FromStr for Version {
+    fn from_str(s: &str) -> Option<Version> {
+        let sp: Vec<&str> = s.split('.').collect();
+        Some(Version::new(try_option!(from_str::<uint>(sp[0])),
+                          try_option!(from_str::<uint>(sp[1])),
+                          try_option!(from_str::<uint>(sp[2]))))
+    }
+}

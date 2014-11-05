@@ -19,19 +19,64 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-use std::time::duration::Duration;
+use std::fmt::{Show, Formatter, mod};
+use std::collections::TreeMap;
+use std::io;
 
-pub mod binary;
+use version::Version;
 
+pub use self::binary::BinaryProto;
+
+mod binarydef;
+mod binary;
+
+#[deriving(Clone)]
+pub enum ErrorKind {
+    MemCachedError(binarydef::Status),
+    IoError(io::IoErrorKind),
+    OtherError,
+}
+
+#[deriving(Clone)]
 pub struct Error {
+    pub kind: ErrorKind,
     pub desc: &'static str,
     pub detail: Option<String>,
 }
 
+impl Error {
+    pub fn new(kind: ErrorKind, desc: &'static str, detail: Option<String>) -> Error {
+        Error {
+            kind: kind,
+            desc: desc,
+            detail: detail,
+        }
+    }
+}
+
+impl Show for Error {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self.detail {
+            Some(ref detail) => write!(f, "{}", detail),
+            None => write!(f, "{}", self.desc),
+        }
+    }
+}
+
 pub trait Proto {
-    fn set(&self, key: &[u8], value: &[u8], flags: u32, expiration: Duration) -> Result<(), Error>;
-    fn add(&self, key: &[u8], value: &[u8], flags: u32, expiration: Duration) -> Result<(), Error>;
-    fn replace(&self, key: &[u8], value: &[u8], flags: u32, expiration: Duration) -> Result<(), Error>;
-    fn get(&self, key: &[u8]) -> Result<Vec<u8>, Error>;
-    fn getk(&self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Error>;
+    fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
+    fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
+    fn delete(&mut self, key: &[u8]) -> Result<(), Error>;
+    fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
+    fn get(&mut self, key: &[u8]) -> Result<(Vec<u8>, u32), Error>;
+    fn getk(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32), Error>;
+    fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error>;
+    fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error>;
+    fn quit(&mut self) -> Result<(), Error>;
+    fn flush(&mut self, expiration: u32) -> Result<(), Error>;
+    fn noop(&mut self) -> Result<(), Error>;
+    fn version(&mut self) -> Result<Version, Error>;
+    fn append(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
+    fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
+    fn stat(&mut self) -> Result<TreeMap<String, String>, Error>;
 }
