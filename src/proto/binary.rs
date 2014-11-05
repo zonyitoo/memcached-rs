@@ -30,22 +30,23 @@ use proto::{Operation, MultiOperation, Error, OtherError, binarydef};
 use version::Version;
 
 macro_rules! try_response(
-    ($packet:expr) => (
-        match $packet.header.status {
+    ($packet:expr) => ( {
+        let pk = $packet;
+        match pk.header.status {
             binarydef::NoError => {
-                $packet
+                pk
             }
             _ => {
                 use proto::MemCachedError;
-                return Err(Error::new(MemCachedError($packet.header.status),
-                                      $packet.header.status.desc(),
-                                      match String::from_utf8($packet.value) {
+                return Err(Error::new(MemCachedError(pk.header.status),
+                                      pk.header.status.desc(),
+                                      match String::from_utf8(pk.value) {
                                           Ok(s) => Some(s),
                                           Err(_) => None,
                                       }))
             }
         }
-    );
+    });
 )
 
 macro_rules! try_io(
@@ -414,7 +415,14 @@ impl MultiOperation for BinaryProto {
 
             try_io!(req_packet.write_to(&mut self.stream));
         }
-        try!(self.noop());
+        try!(self.send_noop());
+
+        loop {
+            let resp = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+            if resp.header.command == binarydef::Noop {
+                break;
+            }
+        }
 
         Ok(())
     }
@@ -434,7 +442,14 @@ impl MultiOperation for BinaryProto {
 
             try_io!(req_packet.write_to(&mut self.stream));
         }
-        try!(self.noop());
+        try!(self.send_noop());
+
+        loop {
+            let resp = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+            if resp.header.command == binarydef::Noop {
+                break;
+            }
+        }
 
         Ok(())
     }
@@ -457,7 +472,7 @@ impl MultiOperation for BinaryProto {
         try!(self.send_noop());
 
         let mut result = Vec::new();
-        for _ in range(0, keys.len()) {
+        loop {
             let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
             let resp = try_response!(resp_packet);
 
@@ -470,10 +485,6 @@ impl MultiOperation for BinaryProto {
 
             result.push((resp.value, flags))
         }
-
-        try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
-
-        Ok(result)
     }
 
     fn getk_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<(Vec<u8>, Vec<u8>, u32)>, Error> {
@@ -672,21 +683,25 @@ mod test {
         let set_resp = client.set_multi(data);
         assert!(set_resp.is_ok());
 
-        // let get_resp = client.get_multi([b"hello1", b"hello2", b"lastone"]);
-        // assert!(get_resp.is_ok());
-        // assert_eq!(get_resp.unwrap(),
-        //           vec![(b"world1".to_vec(), 0xdeadbeef),
-        //                (b"world2".to_vec(), 0xdeadbeef),
-        //                (b"last!".to_vec(), 0xdeadbeef)]);
+        let get_resp = client.get_multi([b"hello1", b"hello2", b"lastone"]);
+        assert!(get_resp.is_ok());
+        assert_eq!(get_resp.unwrap(),
+                  vec![(b"world1".to_vec(), 0xdeadbeef),
+                       (b"world2".to_vec(), 0xdeadbeef),
+                       (b"last!".to_vec(), 0xdeadbeef)]);
 
-        // let del_resp = client.delete_multi([b"hello1", b"hello2"]);
-        // assert!(del_resp.is_ok());
+        let del_resp = client.delete_multi([b"hello1", b"hello2"]);
+        assert!(del_resp.is_ok());
 
-        // let get_resp = client.get_multi([b"lastone", b"hello1", b"hello2"]);
-        // assert!(get_resp.is_ok());
-        // assert_eq!(get_resp.unwrap(), vec![(b"last!".to_vec(), 0xdeadbeef)]);
+        let get_resp = client.get_multi([b"hello1", b"hello2", b"lastone"]);
+        assert!(get_resp.is_ok());
+        assert_eq!(get_resp.unwrap(), vec![(b"last!".to_vec(), 0xdeadbeef)]);
 
-        // let del_resp = client.delete_multi([b"lastone"]);
-        // assert!(del_resp.is_ok());
+        let del_resp = client.delete_multi([b"lastone"]);
+        assert!(del_resp.is_ok());
+
+        let get_resp = client.get_multi([b"hello1", b"hello2", b"lastone"]);
+        assert!(get_resp.is_ok());
+        assert_eq!(get_resp.unwrap(), vec![]);
     }
 }
