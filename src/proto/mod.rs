@@ -63,7 +63,7 @@ impl Show for Error {
     }
 }
 
-pub trait Proto {
+pub trait Operation {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
     fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
     fn delete(&mut self, key: &[u8]) -> Result<(), Error>;
@@ -79,4 +79,17 @@ pub trait Proto {
     fn append(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
     fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;
     fn stat(&mut self) -> Result<TreeMap<String, String>, Error>;
+}
+
+pub trait MultiOperation {
+    fn set_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<(), Error>;
+    fn add_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<(), Error>;
+    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<(), Error>;
+    fn replace_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<(), Error>;
+    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<(Vec<u8>, u32)>, Error>;
+    fn getk_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<(Vec<u8>, Vec<u8>, u32)>, Error>;
+    fn increment_multi(&mut self, kv: TreeMap<&[u8], (u64, u64, u32)>) -> Result<u64, Error>;
+    fn decrement_multi(&mut self, kv: TreeMap<&[u8], (u64, u64, u32)>) -> Result<u64, Error>;
+    fn append_multi(&mut self, kv: TreeMap<&[u8], &[u8]>) -> Result<(), Error>;
+    fn prepend_multi(&mut self, kv: TreeMap<&[u8], &[u8]>) -> Result<(), Error>;
 }

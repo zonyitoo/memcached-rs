@@ -26,7 +26,7 @@ use std::string::String;
 use std::str;
 use std::collections::TreeMap;
 
-use proto::{Proto, Error, OtherError, binarydef};
+use proto::{Operation, MultiOperation, Error, OtherError, binarydef};
 use version::Version;
 
 macro_rules! try_response(
@@ -49,15 +49,16 @@ macro_rules! try_response(
 )
 
 macro_rules! try_io(
-    ($do_io:expr) => (
-        match $do_io {
+    ($do_io:expr) => ( {
+        let io_result = $do_io;
+        match io_result {
             Ok(ret) => { ret },
             Err(err) => {
                 use proto::IoError;
                 return Err(Error::new(IoError(err.kind), err.desc, err.detail));
             }
         }
-    );
+    });
 )
 
 pub struct BinaryProto {
@@ -70,9 +71,23 @@ impl BinaryProto {
             stream: BufferedStream::new(try!(TcpStream::connect(addr, port))),
         })
     }
+
+    fn send_noop(&mut self) -> Result<(), Error> {
+        let req_header = binarydef::RequestHeader::new(binarydef::Noop, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                Vec::new(),
+                                Vec::new(),
+                                Vec::new());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        Ok(())
+    }
 }
 
-impl Proto for BinaryProto {
+impl Operation for BinaryProto {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
         let mut extra_buf = MemWriter::with_capacity(8);
         try_io!(extra_buf.write_be_u32(flags));
@@ -250,7 +265,7 @@ impl Proto for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = binarydef::ResponsePacket::read_from(&mut self.stream).unwrap();
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
 
         try_response!(resp_packet);
 
@@ -278,18 +293,8 @@ impl Proto for BinaryProto {
     }
 
     fn noop(&mut self) -> Result<(), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Noop, binarydef::RawBytes, 0, 0, 0);
-        let mut req_packet = binarydef::RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                Vec::new(),
-                                Vec::new());
-
-        try_io!(req_packet.write_to(&mut self.stream));
-        try_io!(self.stream.flush());
-
-        let resp_packet = binarydef::ResponsePacket::read_from(&mut self.stream).unwrap();
-
+        try!(self.send_noop());
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
         try_response!(resp_packet);
 
         Ok(())
@@ -306,7 +311,7 @@ impl Proto for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = binarydef::ResponsePacket::read_from(&mut self.stream).unwrap();
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
 
         let val = try_response!(resp_packet).value;
         let verstr = match str::from_utf8(val.as_slice()) {
@@ -331,7 +336,7 @@ impl Proto for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = binarydef::ResponsePacket::read_from(&mut self.stream).unwrap();
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
 
         try_response!(resp_packet);
 
@@ -349,7 +354,7 @@ impl Proto for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = binarydef::ResponsePacket::read_from(&mut self.stream).unwrap();
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
 
         try_response!(resp_packet);
 
@@ -369,7 +374,7 @@ impl Proto for BinaryProto {
 
         let mut result = TreeMap::new();
         loop {
-            let resp_packet = binarydef::ResponsePacket::read_from(&mut self.stream).unwrap();
+            let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
             let resp = try_response!(resp_packet);
 
             if resp.key.len() == 0 && resp.value.len() == 0 {
@@ -393,10 +398,110 @@ impl Proto for BinaryProto {
     }
 }
 
+impl MultiOperation for BinaryProto {
+    fn set_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<(), Error> {
+        for (key, &(value, flags, expiration)) in kv.iter() {
+            let mut extra_buf = MemWriter::with_capacity(8);
+            try_io!(extra_buf.write_be_u32(flags));
+            try_io!(extra_buf.write_be_u32(expiration));
+
+            let req_header = binarydef::RequestHeader::new(binarydef::SetQuietly, binarydef::RawBytes, 0, 0, 0);
+            let mut req_packet = binarydef::RequestPacket::new(
+                                    req_header,
+                                    extra_buf.unwrap(),
+                                    key.to_vec(),
+                                    value.to_vec());
+
+            try_io!(req_packet.write_to(&mut self.stream));
+        }
+        try!(self.noop());
+
+        Ok(())
+    }
+
+    fn add_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<(), Error> {
+        unimplemented!();
+    }
+
+    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<(), Error> {
+        for key in keys.iter() {
+            let req_header = binarydef::RequestHeader::new(binarydef::DeleteQuietly, binarydef::RawBytes, 0, 0, 0);
+            let mut req_packet = binarydef::RequestPacket::new(
+                                    req_header,
+                                    Vec::new(),
+                                    key.to_vec(),
+                                    Vec::new());
+
+            try_io!(req_packet.write_to(&mut self.stream));
+        }
+        try!(self.noop());
+
+        Ok(())
+    }
+
+    fn replace_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<(), Error> {
+        unimplemented!();
+    }
+
+    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<(Vec<u8>, u32)>, Error> {
+        for key in keys.iter() {
+            let req_header = binarydef::RequestHeader::new(binarydef::GetQuietly, binarydef::RawBytes, 0, 0, 0);
+            let mut req_packet = binarydef::RequestPacket::new(
+                                    req_header,
+                                    Vec::new(),
+                                    key.to_vec(),
+                                    Vec::new());
+
+            try_io!(req_packet.write_to(&mut self.stream));
+        }
+        try!(self.send_noop());
+
+        let mut result = Vec::new();
+        for _ in range(0, keys.len()) {
+            let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+            let resp = try_response!(resp_packet);
+
+            if resp.header.command == binarydef::Noop {
+                return Ok(result);
+            }
+
+            let mut extrabufr = BufReader::new(resp.extra.as_slice());
+            let flags = try_io!(extrabufr.read_be_u32());
+
+            result.push((resp.value, flags))
+        }
+
+        try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+
+        Ok(result)
+    }
+
+    fn getk_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<(Vec<u8>, Vec<u8>, u32)>, Error> {
+        unimplemented!();
+    }
+
+    fn increment_multi(&mut self, kv: TreeMap<&[u8], (u64, u64, u32)>) -> Result<u64, Error> {
+        unimplemented!();
+    }
+
+    fn decrement_multi(&mut self, kv: TreeMap<&[u8], (u64, u64, u32)>) -> Result<u64, Error> {
+        unimplemented!();
+    }
+
+    fn append_multi(&mut self, kv: TreeMap<&[u8], &[u8]>) -> Result<(), Error> {
+        unimplemented!();
+    }
+
+    fn prepend_multi(&mut self, kv: TreeMap<&[u8], &[u8]>) -> Result<(), Error> {
+        unimplemented!();
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::io::net::ip::Port;
-    use proto::{Proto, BinaryProto};
+    use std::collections::TreeMap;
+    use proto::{Operation, MultiOperation, BinaryProto};
 
     const SERVER_ADDR: &'static str = "127.0.0.1";
     const SERVER_PORT: Port = 11211;
@@ -553,5 +658,35 @@ mod test {
         let mut client = get_client();
         let stat_resp = client.stat();
         assert!(stat_resp.is_ok());
+    }
+
+    #[test]
+    fn test_set_get_delete_muti() {
+        let mut client = get_client();
+
+        let mut data = TreeMap::new();
+        data.insert(b"hello1", (b"world1", 0xdeadbeef, 2));
+        data.insert(b"hello2", (b"world2", 0xdeadbeef, 2));
+        data.insert(b"lastone", (b"last!", 0xdeadbeef, 2));
+
+        let set_resp = client.set_multi(data);
+        assert!(set_resp.is_ok());
+
+        // let get_resp = client.get_multi([b"hello1", b"hello2", b"lastone"]);
+        // assert!(get_resp.is_ok());
+        // assert_eq!(get_resp.unwrap(),
+        //           vec![(b"world1".to_vec(), 0xdeadbeef),
+        //                (b"world2".to_vec(), 0xdeadbeef),
+        //                (b"last!".to_vec(), 0xdeadbeef)]);
+
+        // let del_resp = client.delete_multi([b"hello1", b"hello2"]);
+        // assert!(del_resp.is_ok());
+
+        // let get_resp = client.get_multi([b"lastone", b"hello1", b"hello2"]);
+        // assert!(get_resp.is_ok());
+        // assert_eq!(get_resp.unwrap(), vec![(b"last!".to_vec(), 0xdeadbeef)]);
+
+        // let del_resp = client.delete_multi([b"lastone"]);
+        // assert!(del_resp.is_ok());
     }
 }
