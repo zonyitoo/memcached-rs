@@ -24,6 +24,8 @@ use std::io::net::tcp::TcpStream;
 use std::io::IoResult;
 use std::collections::TreeMap;
 
+use crc32::Crc32;
+
 use proto::{Proto, Operation, Error, mod};
 use version;
 
@@ -59,6 +61,7 @@ impl Server {
 /// ```
 pub struct Client {
     servers: Vec<Server>,
+    key_hasher: Crc32,
 }
 
 impl Client {
@@ -71,48 +74,65 @@ impl Client {
         }
         Client {
             servers: servers,
+            key_hasher: Crc32::new(),
         }
+    }
+
+    fn find_server_by_key<'a>(&'a mut self, key: &[u8]) -> &'a mut Server {
+        let hash = (self.key_hasher.crc(key) >> 16) & 0x7fff;
+        let idx = (hash as uint) % self.servers.len();
+        &mut self.servers[idx]
     }
 }
 
 impl Operation for Client {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
-        unimplemented!();
+        let server = self.find_server_by_key(key);
+        server.proto.set(key, value, flags, expiration)
     }
 
     fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
-        unimplemented!();
+        let server = self.find_server_by_key(key);
+        server.proto.add(key, value, flags, expiration)
     }
 
     fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
-        unimplemented!();
+        let server = self.find_server_by_key(key);
+        server.proto.delete(key)
     }
 
     fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
-        unimplemented!();
+        let server = self.find_server_by_key(key);
+        server.proto.replace(key, value, flags, expiration)
     }
 
     fn get(&mut self, key: &[u8]) -> Result<(Vec<u8>, u32), Error> {
-        unimplemented!();
+        let server = self.find_server_by_key(key);
+        server.proto.get(key)
     }
 
     fn getk(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32), Error> {
-        unimplemented!();
+       let server = self.find_server_by_key(key);
+       server.proto.getk(key)
     }
 
     fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error> {
-        unimplemented!();
+        let server = self.find_server_by_key(key);
+        server.proto.increment(key, amount, initial, expiration)
     }
 
     fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error> {
-        unimplemented!();
+        let server = self.find_server_by_key(key);
+        server.proto.increment(key, amount, initial, expiration)
     }
 
     fn append(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
-        unimplemented!();
+        let server = self.find_server_by_key(key);
+        server.proto.append(key, value)
     }
 
     fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
-        unimplemented!();
+        let server = self.find_server_by_key(key);
+        server.proto.prepend(key, value)
     }
 }
