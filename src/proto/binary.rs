@@ -30,7 +30,7 @@ use proto::{Operation, MultiOperation, Error, OtherError, binarydef};
 use version::Version;
 
 macro_rules! try_response(
-    ($packet:expr) => ( {
+    ($packet:expr) => ({
         let pk = $packet;
         match pk.header.status {
             binarydef::NoError => {
@@ -42,7 +42,24 @@ macro_rules! try_response(
                                       pk.header.status.desc(),
                                       match String::from_utf8(pk.value) {
                                           Ok(s) => Some(s),
-                                          Err(_) => None,
+                                          Err(..) => None,
+                                      }))
+            }
+        }
+    });
+    ($packet:expr, $($ignored:pat)|+) => ({
+        let pk = $packet;
+        match pk.header.status {
+            $(
+                $ignored => { pk }
+            )+
+            _ => {
+                use proto::MemCachedError;
+                return Err(Error::new(MemCachedError(pk.header.status),
+                                      pk.header.status.desc(),
+                                      match String::from_utf8(pk.value) {
+                                          Ok(s) => Some(s),
+                                          Err(..) => None,
                                       }))
             }
         }
@@ -427,10 +444,6 @@ impl MultiOperation for BinaryProto {
         Ok(())
     }
 
-    fn add_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<(), Error> {
-        unimplemented!();
-    }
-
     fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<(), Error> {
         for key in keys.iter() {
             let req_header = binarydef::RequestHeader::new(binarydef::DeleteQuietly, binarydef::RawBytes, 0, 0, 0);
@@ -445,17 +458,14 @@ impl MultiOperation for BinaryProto {
         try!(self.send_noop());
 
         loop {
-            let resp = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+            let resp = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)),
+                                     binarydef::NoError | binarydef::KeyNotFound);
             if resp.header.command == binarydef::Noop {
                 break;
             }
         }
 
         Ok(())
-    }
-
-    fn replace_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<(), Error> {
-        unimplemented!();
     }
 
     fn get_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<(Vec<u8>, u32)>, Error> {
@@ -488,23 +498,32 @@ impl MultiOperation for BinaryProto {
     }
 
     fn getk_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<(Vec<u8>, Vec<u8>, u32)>, Error> {
-        unimplemented!();
-    }
+        for key in keys.iter() {
+            let req_header = binarydef::RequestHeader::new(binarydef::GetKeyQuietly, binarydef::RawBytes, 0, 0, 0);
+            let mut req_packet = binarydef::RequestPacket::new(
+                                    req_header,
+                                    Vec::new(),
+                                    key.to_vec(),
+                                    Vec::new());
 
-    fn increment_multi(&mut self, kv: TreeMap<&[u8], (u64, u64, u32)>) -> Result<u64, Error> {
-        unimplemented!();
-    }
+            try_io!(req_packet.write_to(&mut self.stream));
+        }
+        try!(self.send_noop());
 
-    fn decrement_multi(&mut self, kv: TreeMap<&[u8], (u64, u64, u32)>) -> Result<u64, Error> {
-        unimplemented!();
-    }
+        let mut result = Vec::new();
+        loop {
+            let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+            let resp = try_response!(resp_packet);
 
-    fn append_multi(&mut self, kv: TreeMap<&[u8], &[u8]>) -> Result<(), Error> {
-        unimplemented!();
-    }
+            if resp.header.command == binarydef::Noop {
+                return Ok(result);
+            }
 
-    fn prepend_multi(&mut self, kv: TreeMap<&[u8], &[u8]>) -> Result<(), Error> {
-        unimplemented!();
+            let mut extrabufr = BufReader::new(resp.extra.as_slice());
+            let flags = try_io!(extrabufr.read_be_u32());
+
+            result.push((resp.value, resp.key, flags))
+        }
     }
 }
 
@@ -697,11 +716,31 @@ mod test {
         assert!(get_resp.is_ok());
         assert_eq!(get_resp.unwrap(), vec![(b"last!".to_vec(), 0xdeadbeef)]);
 
-        let del_resp = client.delete_multi([b"lastone"]);
+        let del_resp = client.delete_multi([b"lastone", b"not_exists!!!!"]);
         assert!(del_resp.is_ok());
 
         let get_resp = client.get_multi([b"hello1", b"hello2", b"lastone"]);
         assert!(get_resp.is_ok());
         assert_eq!(get_resp.unwrap(), vec![]);
+    }
+
+    #[test]
+    fn test_getk_multi() {
+        let mut client = get_client();
+
+        let mut data = TreeMap::new();
+        data.insert(b"hello1", (b"world1", 0xdeadbeef, 2));
+        data.insert(b"hello2", (b"world2", 0xdeadbeef, 2));
+        data.insert(b"lastone", (b"last!", 0xdeadbeef, 2));
+
+        let set_resp = client.set_multi(data);
+        assert!(set_resp.is_ok());
+
+        let get_resp = client.getk_multi([b"hello1", b"hello2", b"lastone"]);
+        assert!(get_resp.is_ok());
+        assert_eq!(get_resp.unwrap(),
+                  vec![(b"world1".to_vec(), b"hello1".to_vec(), 0xdeadbeef),
+                       (b"world2".to_vec(), b"hello2".to_vec(), 0xdeadbeef),
+                       (b"last!".to_vec(), b"lastone".to_vec(), 0xdeadbeef)]);
     }
 }
