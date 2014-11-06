@@ -31,6 +31,7 @@
 #[phase(plugin, link)]
 extern crate log;
 extern crate crc32;
+extern crate test;
 
 pub mod proto;
 pub mod version;

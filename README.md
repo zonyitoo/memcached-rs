@@ -15,7 +15,7 @@ use memcached::client::Client;
 use memcached::proto::{Operation, MultiOperation, NoReplyOperation, CasOperation, Binary};
 
 fn main() {
-    let mut client = Client::connect([("127.0.0.1:11211", Binary, 1)]);
+    let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
 
     client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
     let (value, flags) = client.get(b"Foo").unwrap();

@@ -56,7 +56,7 @@ impl Server {
 /// use memcached::client::Client;
 /// use memcached::proto::{Operation, MultiOperation, NoReplyOperation, CasOperation, Binary};
 ///
-/// let mut client = Client::connect([("127.0.0.1:11211", Binary, 1)]);
+/// let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
 ///
 /// client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
 /// let (value, flags) = client.get(b"Foo").unwrap();
@@ -85,11 +85,11 @@ impl Client {
     /// This function accept multiple servers, servers information should be represented
     /// as a array of tuples in this form
     ///
-    /// `(address, ProtoType, weight)`.
-    pub fn connect(svrs: &[(&str, proto::ProtoType, uint)]) -> Client {
+    /// `(address, weight)`.
+    pub fn connect(svrs: &[(&str, uint)], p: proto::ProtoType) -> Client {
         let mut servers = Vec::new();
         let mut bucket = Vec::new();
-        for &(addr, p, weight) in svrs.iter() {
+        for &(addr, weight) in svrs.iter() {
             servers.push(Arc::new(Mutex::new(Server::connect(addr, p).unwrap_or_else(|err| {
                 panic!("Cannot connect server {}: {}", addr, err);
             }))));
@@ -412,5 +412,127 @@ impl CasOperation for Client {
     fn touch_cas(&mut self, key: &[u8], expiration: u32, cas: u64) -> Result<u64, Error> {
         let server = self.find_server_by_key(key);
         server.lock().proto.touch_cas(key, expiration, cas)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use test::Bencher;
+    use client::Client;
+    use proto::{Operation, NoReplyOperation, Binary};
+    use std::rand::random;
+
+    fn generate_data(len: uint) -> Vec<u8> {
+        Vec::from_fn(len, |_| random())
+    }
+
+    #[bench]
+    fn bench_set_64(b: &mut Bencher) {
+        let key = b"test:test_bench";
+        let val = generate_data(64);
+
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+
+        b.iter(|| client.set(key, val.as_slice(), 0, 2));
+        b.bytes = 64;
+    }
+
+    #[bench]
+    fn bench_set_noreply_64(b: &mut Bencher) {
+        let key = b"test:test_bench";
+        let val = generate_data(64);
+
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+
+        b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
+        b.bytes = 64;
+    }
+
+    #[bench]
+    fn bench_set_512(b: &mut Bencher) {
+        let key = b"test:test_bench";
+        let val = generate_data(512);
+
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+
+        b.iter(|| client.set(key, val.as_slice(), 0, 2));
+        b.bytes = 512;
+    }
+
+    #[bench]
+    fn bench_set_noreply_512(b: &mut Bencher) {
+        let key = b"test:test_bench";
+        let val = generate_data(512);
+
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+
+        b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
+        b.bytes = 512;
+    }
+
+    #[bench]
+    fn bench_set_1024(b: &mut Bencher) {
+        let key = b"test:test_bench";
+        let val = generate_data(1024);
+
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+
+        b.iter(|| client.set(key, val.as_slice(), 0, 2));
+        b.bytes = 1024;
+    }
+
+    #[bench]
+    fn bench_set_noreply_1024(b: &mut Bencher) {
+        let key = b"test:test_bench";
+        let val = generate_data(1024);
+
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+
+        b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
+        b.bytes = 1024;
+    }
+
+    #[bench]
+    fn bench_set_4096(b: &mut Bencher) {
+        let key = b"test:test_bench";
+        let val = generate_data(4096);
+
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+
+        b.iter(|| client.set(key, val.as_slice(), 0, 2));
+        b.bytes = 4096;
+    }
+
+    #[bench]
+    fn bench_set_noreply_4096(b: &mut Bencher) {
+        let key = b"test:test_bench";
+        let val = generate_data(4096);
+
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+
+        b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
+        b.bytes = 4096;
+    }
+
+    #[bench]
+    fn bench_set_16384(b: &mut Bencher) {
+        let key = b"test:test_bench";
+        let val = generate_data(16384);
+
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+
+        b.iter(|| client.set(key, val.as_slice(), 0, 2));
+        b.bytes = 16384;
+    }
+
+    #[bench]
+    fn bench_set_noreply_16384(b: &mut Bencher) {
+        let key = b"test:test_bench";
+        let val = generate_data(16384);
+
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+
+        b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
+        b.bytes = 16384;
     }
 }
