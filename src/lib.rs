@@ -23,7 +23,7 @@
 #![license = "MIT"]
 #![crate_type = "lib"]
 #![crate_name = "memcached"]
-#![desc = "Memcached client in Rust"]
+#![desc = "Memcached library in Rust"]
 
 #![feature(phase)]
 #![feature(macro_rules)]

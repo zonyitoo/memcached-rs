@@ -194,9 +194,9 @@ pub trait ServerOperation {
 }
 
 pub trait MultiOperation {
-    fn set_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<Vec<Result<(), Error>>, Error>;
-    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<(), Error>;
-    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<TreeMap<Vec<u8>, (Vec<u8>, u32)>, Error>;
+    fn set_multi(&mut self, kv: TreeMap<Vec<u8>, (Vec<u8>, u32, u32)>) -> Result<(), Error>;
+    fn delete_multi(&mut self, keys: Vec<Vec<u8>>) -> Result<(), Error>;
+    fn get_multi(&mut self, keys: Vec<Vec<u8>>) -> Result<TreeMap<Vec<u8>, (Vec<u8>, u32)>, Error>;
 }
 
 pub trait NoReplyOperation {

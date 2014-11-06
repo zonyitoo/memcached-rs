@@ -26,7 +26,7 @@ use std::str;
 use std::collections::TreeMap;
 
 use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation};
-use proto::{Error, OtherError, MemCachedError, binarydef, mod};
+use proto::{Error, OtherError, binarydef, mod};
 use version::Version;
 
 macro_rules! try_response(
@@ -440,50 +440,38 @@ impl ServerOperation for BinaryProto {
 }
 
 impl MultiOperation for BinaryProto {
-    fn set_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<Vec<Result<(), Error>>, Error> {
-        let mut result = Vec::new();
-
-        for (key, &(value, flags, expiration)) in kv.iter() {
+    fn set_multi(&mut self, kv: TreeMap<Vec<u8>, (Vec<u8>, u32, u32)>) -> Result<(), Error> {
+        for (key, (value, flags, expiration)) in kv.into_iter() {
             let mut extra_buf = MemWriter::with_capacity(8);
             try_io!(extra_buf.write_be_u32(flags));
             try_io!(extra_buf.write_be_u32(expiration));
 
-            let req_header = binarydef::RequestHeader::new(binarydef::Set, binarydef::RawBytes, 0, 0, 0);
+            let req_header = binarydef::RequestHeader::new(binarydef::SetQuietly, binarydef::RawBytes, 0, 0, 0);
             let mut req_packet = binarydef::RequestPacket::new(
                                     req_header,
                                     extra_buf.unwrap(),
-                                    key.to_vec(),
-                                    value.to_vec());
+                                    key,
+                                    value);
 
             try_io!(req_packet.write_to(&mut self.stream));
-            try_io!(self.stream.flush());
+        }
+        try!(self.send_noop());
 
-            let resp = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-            match resp.header.status {
-                proto::NoError => {
-                    result.push(Ok(()))
-                },
-                _ => {
-                    result.push(Err(Error::new(MemCachedError(resp.header.status),
-                                      resp.header.status.desc(),
-                                      match String::from_utf8(resp.value) {
-                                          Ok(s) => Some(s),
-                                          Err(..) => None,
-                                      })))
-                }
+        loop {
+            let resp = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+            if resp.header.command == binarydef::Noop {
+                return Ok(())
             }
         }
-
-        Ok(result)
     }
 
-    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<(), Error> {
-        for key in keys.iter() {
+    fn delete_multi(&mut self, keys: Vec<Vec<u8>>) -> Result<(), Error> {
+        for key in keys.into_iter() {
             let req_header = binarydef::RequestHeader::new(binarydef::DeleteQuietly, binarydef::RawBytes, 0, 0, 0);
             let mut req_packet = binarydef::RequestPacket::new(
                                     req_header,
                                     Vec::new(),
-                                    key.to_vec(),
+                                    key,
                                     Vec::new());
 
             try_io!(req_packet.write_to(&mut self.stream));
@@ -500,14 +488,14 @@ impl MultiOperation for BinaryProto {
         }
     }
 
-    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<TreeMap<Vec<u8>, (Vec<u8>, u32)>, Error> {
+    fn get_multi(&mut self, keys: Vec<Vec<u8>>) -> Result<TreeMap<Vec<u8>, (Vec<u8>, u32)>, Error> {
 
-        for key in keys.iter() {
+        for key in keys.into_iter() {
             let req_header = binarydef::RequestHeader::new(binarydef::GetKeyQuietly, binarydef::RawBytes, 0, 0, 0);
             let mut req_packet = binarydef::RequestPacket::new(
                                     req_header,
                                     Vec::new(),
-                                    key.to_vec(),
+                                    key,
                                     Vec::new());
 
             try_io!(req_packet.write_to(&mut self.stream));
@@ -1050,16 +1038,16 @@ mod test {
         let mut client = get_client();
 
         let mut data = TreeMap::new();
-        data.insert(b"test:multi_hello1", (b"world1", 0xdeadbeef, 20));
-        data.insert(b"test:multi_hello2", (b"world2", 0xdeadbeef, 20));
-        data.insert(b"test:multi_lastone", (b"last!", 0xdeadbeef, 20));
+        data.insert(b"test:multi_hello1".to_vec(), (b"world1".to_vec(), 0xdeadbeef, 20));
+        data.insert(b"test:multi_hello2".to_vec(), (b"world2".to_vec(), 0xdeadbeef, 20));
+        data.insert(b"test:multi_lastone".to_vec(), (b"last!".to_vec(), 0xdeadbeef, 20));
 
         let set_resp = client.set_multi(data);
         assert!(set_resp.is_ok());
 
-        let get_resp = client.get_multi([b"test:multi_hello1",
-                                         b"test:multi_hello2",
-                                         b"test:multi_lastone"]);
+        let get_resp = client.get_multi(vec![b"test:multi_hello1".to_vec(),
+                                             b"test:multi_hello2".to_vec(),
+                                             b"test:multi_lastone".to_vec()]);
         assert!(get_resp.is_ok());
 
         let get_resp_map = get_resp.as_ref().unwrap();
@@ -1070,12 +1058,13 @@ mod test {
         assert_eq!(get_resp_map.find(&b"test:multi_lastone".to_vec()),
                    Some(&(b"last!".to_vec(), 0xdeadbeef)))
 
-        let del_resp = client.delete_multi([b"test:multi_hello1", b"test:multi_hello2"]);
+        let del_resp = client.delete_multi(vec![b"test:multi_hello1".to_vec(),
+                                                b"test:multi_hello2".to_vec()]);
         assert!(del_resp.is_ok());
 
-        let get_resp = client.get_multi([b"test:multi_hello1",
-                                         b"test:multi_hello2",
-                                         b"test:multi_lastone"]);
+        let get_resp = client.get_multi(vec![b"test:multi_hello1".to_vec(),
+                                             b"test:multi_hello2".to_vec(),
+                                             b"test:multi_lastone".to_vec()]);
         assert!(get_resp.is_ok());
 
         let get_resp_map = get_resp.as_ref().unwrap();
@@ -1086,7 +1075,8 @@ mod test {
         assert_eq!(get_resp_map.find(&b"test:multi_lastone".to_vec()),
                    Some(&(b"last!".to_vec(), 0xdeadbeef)))
 
-        let del_resp = client.delete_multi([b"lastone", b"not_exists!!!!"]);
+        let del_resp = client.delete_multi(vec![b"lastone".to_vec(),
+                                                b"not_exists!!!!".to_vec()]);
         assert!(del_resp.is_ok());
     }
 
