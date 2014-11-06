@@ -30,20 +30,20 @@
 //    /              |               |               |               |
 //   |0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|0 1 2 3 4 5 6 7|
 //   +---------------+---------------+---------------+---------------+
-//   0/ HEADER                                                        /
+//  0/ HEADER                                                        /
 //   /                                                               /
 //   /                                                               /
 //   /                                                               /
 //   +---------------+---------------+---------------+---------------+
-//   24/ COMMAND-SPECIFIC EXTRAS (as needed)                           /
-//   +/  (note length in the extras length header field)              /
+// 24/ COMMAND-SPECIFIC EXTRAS (as needed)                           /
+//  +/  (note length in the extras length header field)              /
 //   +---------------+---------------+---------------+---------------+
-//   m/ Key (as needed)                                               /
-//   +/  (note length in key length header field)                     /
+//  m/ Key (as needed)                                               /
+//  +/  (note length in key length header field)                     /
 //   +---------------+---------------+---------------+---------------+
-//   n/ Value (as needed)                                             /
-//   +/  (note length is total body length header field, minus        /
-//   +/   sum of the extras and key length body fields)               /
+//  n/ Value (as needed)                                             /
+//  +/  (note length is total body length header field, minus        /
+//  +/   sum of the extras and key length body fields)               /
 //   +---------------+---------------+---------------+---------------+
 //   Total 24 bytes
 

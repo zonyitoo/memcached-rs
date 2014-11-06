@@ -26,7 +26,7 @@ use std::collections::TreeMap;
 
 use crc32::Crc32;
 
-use proto::{Proto, Operation, MultiOperation, ServerOperation, Error, mod};
+use proto::{Proto, Operation, MultiOperation, ServerOperation, NoReplyOperation, Error, mod};
 
 struct Server {
     pub proto: Box<Proto + Send>,
@@ -58,14 +58,14 @@ impl Server {
 /// assert_eq!(value.as_slice(), b"Bar");
 /// assert_eq!(flags, 0xdeadbeef);
 /// ```
-pub struct Client<'c> {
+pub struct Client {
     servers: Vec<Server>,
     key_hasher: Crc32,
     bucket: Vec<uint>,
 }
 
-impl<'s> Client<'s> {
-    pub fn connect<'s>(svrs: &[(&str, Port, proto::ProtoType, uint)]) -> Client<'s> {
+impl Client {
+    pub fn connect(svrs: &[(&str, Port, proto::ProtoType, uint)]) -> Client {
         let mut servers = Vec::new();
         let mut bucket = Vec::new();
         for &(addr, port, p, weight) in svrs.iter() {
@@ -98,7 +98,7 @@ impl<'s> Client<'s> {
     }
 }
 
-impl<'c> Operation for Client<'c> {
+impl Operation for Client {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
         let server = self.find_server_by_key(key);
         server.proto.set(key, value, flags, expiration)
@@ -155,20 +155,58 @@ impl<'c> Operation for Client<'c> {
     }
 }
 
-impl<'c> MultiOperation for Client<'c> {
+impl MultiOperation for Client {
     fn set_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<Vec<Result<(), Error>>, Error> {
         unimplemented!();
     }
 
-    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Result<(), Error>>, Error> {
+    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<(), Error> {
         unimplemented!();
     }
 
-    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Option<(Vec<u8>, u32)>>, Error> {
+    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<TreeMap<Vec<u8>, (Vec<u8>, u32)>, Error> {
         unimplemented!();
     }
+}
 
-    fn getk_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Option<(Vec<u8>, Vec<u8>, u32)>>, Error> {
-        unimplemented!();
+impl NoReplyOperation for Client {
+    fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.set_noreply(key, value, flags, expiration)
+    }
+
+    fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.add_noreply(key, value, flags, expiration)
+    }
+
+    fn delete_noreply(&mut self, key: &[u8]) -> Result<(), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.delete_noreply(key)
+    }
+
+    fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.replace_noreply(key, value, flags, expiration)
+    }
+
+    fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.increment_noreply(key, amount, initial, expiration)
+    }
+
+    fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.decrement_noreply(key, amount, initial, expiration)
+    }
+
+    fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.append_noreply(key, value)
+    }
+
+    fn prepend_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.prepend_noreply(key, value)
     }
 }

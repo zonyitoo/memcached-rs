@@ -153,8 +153,8 @@ impl Show for Error {
     }
 }
 
-pub trait Proto: Operation + MultiOperation + ServerOperation {}
-impl<T: Operation + MultiOperation + ServerOperation> Proto for T {}
+pub trait Proto: Operation + MultiOperation + ServerOperation + NoReplyOperation {}
+impl<T: Operation + MultiOperation + ServerOperation + NoReplyOperation> Proto for T {}
 
 pub trait Operation {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
@@ -196,9 +196,8 @@ pub trait ServerOperation {
 
 pub trait MultiOperation {
     fn set_multi(&mut self, kv: TreeMap<&[u8], (&[u8], u32, u32)>) -> Result<Vec<Result<(), Error>>, Error>;
-    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Result<(), Error>>, Error>;
-    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Option<(Vec<u8>, u32)>>, Error>;
-    fn getk_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Option<(Vec<u8>, Vec<u8>, u32)>>, Error>;
+    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<(), Error>;
+    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<TreeMap<Vec<u8>, (Vec<u8>, u32)>, Error>;
 }
 
 pub trait NoReplyOperation {
@@ -206,7 +205,6 @@ pub trait NoReplyOperation {
     fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
     fn delete_noreply(&mut self, key: &[u8]) -> Result<(), Error>;
     fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
-    fn touch_noreply(&mut self, key: &[u8], expiration: u32) -> Result<(), Error>;
     fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error>;
     fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error>;
     fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error>;

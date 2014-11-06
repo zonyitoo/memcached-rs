@@ -25,7 +25,8 @@ use std::string::String;
 use std::str;
 use std::collections::TreeMap;
 
-use proto::{Operation, MultiOperation, ServerOperation, Error, OtherError, MemCachedError, binarydef, mod};
+use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation};
+use proto::{Error, OtherError, MemCachedError, binarydef, mod};
 use version::Version;
 
 macro_rules! try_response(
@@ -476,11 +477,9 @@ impl MultiOperation for BinaryProto {
         Ok(result)
     }
 
-    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Result<(), Error>>, Error> {
-        let mut result = Vec::new();
-
+    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<(), Error> {
         for key in keys.iter() {
-            let req_header = binarydef::RequestHeader::new(binarydef::Delete, binarydef::RawBytes, 0, 0, 0);
+            let req_header = binarydef::RequestHeader::new(binarydef::DeleteQuietly, binarydef::RawBytes, 0, 0, 0);
             let mut req_packet = binarydef::RequestPacket::new(
                                     req_header,
                                     Vec::new(),
@@ -488,95 +487,183 @@ impl MultiOperation for BinaryProto {
                                     Vec::new());
 
             try_io!(req_packet.write_to(&mut self.stream));
-            try_io!(self.stream.flush());
-
-            let resp = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
-            match resp.header.status {
-                proto::NoError => {
-                    result.push(Ok(()))
-                },
-                _ => {
-                    result.push(Err(Error::new(MemCachedError(resp.header.status),
-                                      resp.header.status.desc(),
-                                      match String::from_utf8(resp.value) {
-                                          Ok(s) => Some(s),
-                                          Err(..) => None,
-                                      })))
-                }
-            }
         }
+        try!(self.send_noop());
 
-        Ok(result)
-    }
-
-    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Option<(Vec<u8>, u32)>>, Error> {
-        let mut result = Vec::new();
-
-        for key in keys.iter() {
-            let req_header = binarydef::RequestHeader::new(binarydef::Get, binarydef::RawBytes, 0, 0, 0);
-            let mut req_packet = binarydef::RequestPacket::new(
-                                    req_header,
-                                    Vec::new(),
-                                    key.to_vec(),
-                                    Vec::new());
-
-            try_io!(req_packet.write_to(&mut self.stream));
-            try_io!(self.stream.flush());
-
+        loop {
             let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
             let resp = try_response!(resp_packet, ignore: proto::NoError | proto::KeyNotFound);
-            match resp.header.status {
-                proto::NoError => {},
-                proto::KeyNotFound => {
-                    result.push(None);
-                    continue;
-                },
-                _ => {}
+
+            if resp.header.command == binarydef::Noop {
+                return Ok(());
+            }
+        }
+    }
+
+    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<TreeMap<Vec<u8>, (Vec<u8>, u32)>, Error> {
+
+        for key in keys.iter() {
+            let req_header = binarydef::RequestHeader::new(binarydef::GetKeyQuietly, binarydef::RawBytes, 0, 0, 0);
+            let mut req_packet = binarydef::RequestPacket::new(
+                                    req_header,
+                                    Vec::new(),
+                                    key.to_vec(),
+                                    Vec::new());
+
+            try_io!(req_packet.write_to(&mut self.stream));
+        }
+        try!(self.send_noop());
+
+        let mut result = TreeMap::new();
+        loop {
+            let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+            let resp = try_response!(resp_packet);
+
+            if resp.header.command == binarydef::Noop {
+                return Ok(result);
             }
 
             let mut extrabufr = BufReader::new(resp.extra.as_slice());
             let flags = try_io!(extrabufr.read_be_u32());
 
-            result.push(Some((resp.value, flags)))
+            result.insert(resp.key, (resp.value, flags));
         }
+    }
+}
 
-        Ok(result)
+impl NoReplyOperation for BinaryProto {
+    fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let mut extra_buf = MemWriter::with_capacity(8);
+        try_io!(extra_buf.write_be_u32(flags));
+        try_io!(extra_buf.write_be_u32(expiration));
+
+        let req_header = binarydef::RequestHeader::new(binarydef::SetQuietly, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                value.to_vec());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        Ok(())
     }
 
-    fn getk_multi(&mut self, keys: &[&[u8]]) -> Result<Vec<Option<(Vec<u8>, Vec<u8>, u32)>>, Error> {
-        let mut result = Vec::new();
+    fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let mut extra_buf = MemWriter::with_capacity(8);
+        try_io!(extra_buf.write_be_u32(flags));
+        try_io!(extra_buf.write_be_u32(expiration));
 
-        for key in keys.iter() {
-            let req_header = binarydef::RequestHeader::new(binarydef::GetKey, binarydef::RawBytes, 0, 0, 0);
-            let mut req_packet = binarydef::RequestPacket::new(
-                                    req_header,
-                                    Vec::new(),
-                                    key.to_vec(),
-                                    Vec::new());
+        let req_header = binarydef::RequestHeader::new(binarydef::AddQuietly, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                value.to_vec());
 
-            try_io!(req_packet.write_to(&mut self.stream));
-            try_io!(self.stream.flush());
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
 
-            let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-            let resp = try_response!(resp_packet, ignore: proto::NoError | proto::KeyNotFound);
+        Ok(())
+    }
 
-            match resp.header.status {
-                proto::NoError => {},
-                proto::KeyNotFound => {
-                    result.push(None);
-                    continue;
-                },
-                _ => {}
-            };
+    fn delete_noreply(&mut self, key: &[u8]) -> Result<(), Error> {
+        let req_header = binarydef::RequestHeader::new(binarydef::DeleteQuietly, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                Vec::new(),
+                                key.to_vec(),
+                                Vec::new());
 
-            let mut extrabufr = BufReader::new(resp.extra.as_slice());
-            let flags = try_io!(extrabufr.read_be_u32());
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
 
-            result.push(Some((resp.value, resp.key, flags)))
-        }
+        Ok(())
+    }
 
-        Ok(result)
+    fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let mut extra_buf = MemWriter::with_capacity(8);
+        try_io!(extra_buf.write_be_u32(flags));
+        try_io!(extra_buf.write_be_u32(expiration));
+
+        let req_header = binarydef::RequestHeader::new(binarydef::ReplaceQuietly, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                value.to_vec());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        Ok(())
+    }
+
+    fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error> {
+        let mut extra_buf = MemWriter::with_capacity(20);
+        try_io!(extra_buf.write_be_u64(amount));
+        try_io!(extra_buf.write_be_u64(initial));
+        try_io!(extra_buf.write_be_u32(expiration));
+
+        let req_header = binarydef::RequestHeader::new(binarydef::IncrementQuietly, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                Vec::new());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        Ok(())
+    }
+
+    fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error> {
+        let mut extra_buf = MemWriter::with_capacity(20);
+        try_io!(extra_buf.write_be_u64(amount));
+        try_io!(extra_buf.write_be_u64(initial));
+        try_io!(extra_buf.write_be_u32(expiration));
+
+        let req_header = binarydef::RequestHeader::new(binarydef::DecrementQuietly, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                Vec::new());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        Ok(())
+    }
+
+    fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
+        let req_header = binarydef::RequestHeader::new(binarydef::AppendQuietly, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                Vec::new(),
+                                key.to_vec(),
+                                value.to_vec());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        Ok(())
+    }
+
+    fn prepend_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
+        let req_header = binarydef::RequestHeader::new(binarydef::PrependQuietly, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                Vec::new(),
+                                key.to_vec(),
+                                value.to_vec());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        Ok(())
     }
 }
 
@@ -585,7 +672,7 @@ mod test {
     use std::io::net::ip::Port;
     use std::io::net::tcp::TcpStream;
     use std::collections::TreeMap;
-    use proto::{Operation, MultiOperation, ServerOperation, BinaryProto};
+    use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, BinaryProto};
 
     const SERVER_ADDR: &'static str = "127.0.0.1";
     const SERVER_PORT: Port = 11211;
@@ -764,52 +851,76 @@ mod test {
         let mut client = get_client();
 
         let mut data = TreeMap::new();
-        data.insert(b"hello1", (b"world1", 0xdeadbeef, 2));
-        data.insert(b"hello2", (b"world2", 0xdeadbeef, 2));
-        data.insert(b"lastone", (b"last!", 0xdeadbeef, 2));
+        data.insert(b"test:multi_hello1", (b"world1", 0xdeadbeef, 2));
+        data.insert(b"test:multi_hello2", (b"world2", 0xdeadbeef, 2));
+        data.insert(b"test:multi_lastone", (b"last!", 0xdeadbeef, 2));
 
         let set_resp = client.set_multi(data);
         assert!(set_resp.is_ok());
 
-        let get_resp = client.get_multi([b"hello1", b"hello2", b"lastone"]);
+        let get_resp = client.get_multi([b"test:multi_hello1",
+                                         b"test:multi_hello2",
+                                         b"test:multi_lastone"]);
         assert!(get_resp.is_ok());
-        assert_eq!(get_resp.unwrap(),
-                  vec![Some((b"world1".to_vec(), 0xdeadbeef)),
-                       Some((b"world2".to_vec(), 0xdeadbeef)),
-                       Some((b"last!".to_vec(), 0xdeadbeef))]);
 
-        let del_resp = client.delete_multi([b"hello1", b"hello2"]);
+        let get_resp_map = get_resp.as_ref().unwrap();
+        assert_eq!(get_resp_map.find(&b"test:multi_hello1".to_vec()),
+                   Some(&(b"world1".to_vec(), 0xdeadbeef)));
+        assert_eq!(get_resp_map.find(&b"test:multi_hello2".to_vec()),
+                   Some(&(b"world2".to_vec(), 0xdeadbeef)));
+        assert_eq!(get_resp_map.find(&b"test:multi_lastone".to_vec()),
+                   Some(&(b"last!".to_vec(), 0xdeadbeef)))
+
+        let del_resp = client.delete_multi([b"test:multi_hello1", b"test:multi_hello2"]);
         assert!(del_resp.is_ok());
 
-        let get_resp = client.get_multi([b"hello1", b"hello2", b"lastone"]);
+        let get_resp = client.get_multi([b"test:multi_hello1",
+                                         b"test:multi_hello2",
+                                         b"test:multi_lastone"]);
         assert!(get_resp.is_ok());
-        assert_eq!(get_resp.unwrap(), vec![None, None, Some((b"last!".to_vec(), 0xdeadbeef))]);
+
+        let get_resp_map = get_resp.as_ref().unwrap();
+        assert_eq!(get_resp_map.find(&b"test:multi_hello1".to_vec()),
+                   None);
+        assert_eq!(get_resp_map.find(&b"test:multi_hello2".to_vec()),
+                   None);
+        assert_eq!(get_resp_map.find(&b"test:multi_lastone".to_vec()),
+                   Some(&(b"last!".to_vec(), 0xdeadbeef)))
 
         let del_resp = client.delete_multi([b"lastone", b"not_exists!!!!"]);
         assert!(del_resp.is_ok());
-
-        let get_resp = client.get_multi([b"hello1", b"hello2", b"lastone"]);
-        assert!(get_resp.is_ok());
-        assert_eq!(get_resp.unwrap(), vec![None, None, None]);
     }
 
     #[test]
-    fn test_getk_multi() {
+    fn test_set_add_replace_noreply() {
+        let key = b"test:noreply_key";
+        let set_val = b"value";
+        let add_val = b"just add";
+        let rep_val = b"replaced";
+
         let mut client = get_client();
 
-        let mut data = TreeMap::new();
-        data.insert(b"hello1", (b"world1", 0xdeadbeef, 2));
-        data.insert(b"hello2", (b"world2", 0xdeadbeef, 2));
-        data.insert(b"lastone", (b"last!", 0xdeadbeef, 2));
+        let add_resp = client.add_noreply(key, add_val, 0xdeadbeef, 2);
+        assert!(add_resp.is_ok());
 
-        let set_resp = client.set_multi(data);
+        let get_resp = client.get(key);
+        assert!(get_resp.is_ok());
+        assert_eq!(get_resp.unwrap(), (add_val.to_vec(), 0xdeadbeef));
+
+        let set_resp = client.set_noreply(key, set_val, 0xdeadbeef, 2);
         assert!(set_resp.is_ok());
 
-        let get_resp = client.getk_multi([b"hello1", b"hello2", b"lastone"]);
+        let get_resp = client.get(key);
         assert!(get_resp.is_ok());
-        assert_eq!(get_resp.unwrap(),
-                  vec![Some((b"world1".to_vec(), b"hello1".to_vec(), 0xdeadbeef)),
-                       Some((b"world2".to_vec(), b"hello2".to_vec(), 0xdeadbeef)),
-                       Some((b"last!".to_vec(), b"lastone".to_vec(), 0xdeadbeef))]);
+        assert_eq!(get_resp.unwrap(), (set_val.to_vec(), 0xdeadbeef));
+
+        let rep_resp = client.replace_noreply(key, rep_val, 0xcafebabe, 2);
+        assert!(rep_resp.is_ok());
+
+        let get_resp = client.get(key);
+        assert!(get_resp.is_ok());
+        assert_eq!(get_resp.unwrap(), (rep_val.to_vec(), 0xcafebabe));
+
+        assert!(client.delete(key).is_ok());
     }
 }
