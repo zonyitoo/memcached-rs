@@ -19,6 +19,8 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+//! Memcached client
+
 use std::io::net::ip::Port;
 use std::io::net::tcp::TcpStream;
 use std::io::IoResult;
@@ -68,6 +70,12 @@ pub struct Client {
 }
 
 impl Client {
+    /// Connect to Memcached servers
+    ///
+    /// This function accept multiple servers, servers information should be represented
+    /// as a array of tuples in this form
+    ///
+    /// `(address, port, ProtoType, weight)`.
     pub fn connect(svrs: &[(&str, Port, proto::ProtoType, uint)]) -> Client {
         let mut servers = Vec::new();
         let mut bucket = Vec::new();
@@ -97,6 +105,7 @@ impl Client {
         self.servers[idx].clone()
     }
 
+    /// Flush data in all servers
     pub fn flush_all(&mut self) -> Result<(), Error> {
         for s in self.servers.iter_mut() {
             try!(s.lock().proto.flush(0));

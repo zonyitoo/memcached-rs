@@ -19,6 +19,8 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+//! Memcached protocol
+
 use std::fmt::{Show, Formatter, mod};
 use std::collections::TreeMap;
 use std::io;
@@ -30,6 +32,7 @@ pub use self::binary::BinaryProto;
 mod binarydef;
 mod binary;
 
+/// Memcached response status
 #[deriving(Clone, Show, Eq, PartialEq)]
 pub enum Status {
     NoError,
@@ -51,6 +54,7 @@ pub enum Status {
 }
 
 impl Status {
+    /// Get the binary code of the status
     pub fn code(&self) -> u16 {
         match *self {
             NoError => binarydef::STATUS_NO_ERROR,
@@ -72,6 +76,7 @@ impl Status {
         }
     }
 
+    /// Generate a Status from binary code
     pub fn from_code(code: u16) -> Option<Status> {
         match code {
             binarydef::STATUS_NO_ERROR => Some(NoError),
@@ -94,6 +99,7 @@ impl Status {
         }
     }
 
+    /// Get a short description
     pub fn desc(&self) -> &'static str {
         match *self {
             NoError => "no error",
@@ -116,6 +122,7 @@ impl Status {
     }
 }
 
+/// Protocol type
 pub enum ProtoType {
     Binary,
 }
