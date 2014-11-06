@@ -25,7 +25,7 @@ use std::string::String;
 use std::str;
 use std::collections::TreeMap;
 
-use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation};
+use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation};
 use proto::{Error, OtherError, MemCachedError, binarydef, mod};
 use version::Version;
 
@@ -667,12 +667,211 @@ impl NoReplyOperation for BinaryProto {
     }
 }
 
+impl CasOperation for BinaryProto {
+    fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error> {
+        let mut extra_buf = MemWriter::with_capacity(8);
+        try_io!(extra_buf.write_be_u32(flags));
+        try_io!(extra_buf.write_be_u32(expiration));
+
+        let req_header = binarydef::RequestHeader::new(binarydef::Set, binarydef::RawBytes, 0, 0, cas);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                value.to_vec());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let resp = try_response!(resp_packet);
+        Ok(resp.header.cas)
+    }
+
+    fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<u64, Error> {
+        let mut extra_buf = MemWriter::with_capacity(8);
+        try_io!(extra_buf.write_be_u32(flags));
+        try_io!(extra_buf.write_be_u32(expiration));
+
+        let req_header = binarydef::RequestHeader::new(binarydef::Add, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                value.to_vec());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+        Ok(resp_packet.header.cas)
+    }
+
+    fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error> {
+        let mut extra_buf = MemWriter::with_capacity(8);
+        try_io!(extra_buf.write_be_u32(flags));
+        try_io!(extra_buf.write_be_u32(expiration));
+
+        let req_header = binarydef::RequestHeader::new(binarydef::Replace, binarydef::RawBytes, 0, 0, cas);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                value.to_vec());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+        Ok(resp_packet.header.cas)
+    }
+
+    fn get_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, u32, u64), Error> {
+        let req_header = binarydef::RequestHeader::new(binarydef::Get, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                Vec::new(),
+                                key.to_vec(),
+                                Vec::new());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let resp = try_response!(resp_packet);
+
+        let mut extrabufr = BufReader::new(resp.extra.as_slice());
+        let flags = try_io!(extrabufr.read_be_u32());
+
+        Ok((resp.value, flags, resp.header.cas))
+    }
+
+    fn getk_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32, u64), Error> {
+        let req_header = binarydef::RequestHeader::new(binarydef::GetKey, binarydef::RawBytes, 0, 0, 0);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                Vec::new(),
+                                key.to_vec(),
+                                Vec::new());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let resp = try_response!(resp_packet);
+
+        let mut extrabufr = BufReader::new(resp.extra.as_slice());
+        let flags = try_io!(extrabufr.read_be_u32());
+
+        Ok((resp.key, resp.value, flags, resp.header.cas))
+    }
+
+    fn increment_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
+            -> Result<(u64, u64), Error> {
+        let mut extra_buf = MemWriter::with_capacity(20);
+        try_io!(extra_buf.write_be_u64(amount));
+        try_io!(extra_buf.write_be_u64(initial));
+        try_io!(extra_buf.write_be_u32(expiration));
+
+        let req_header = binarydef::RequestHeader::new(binarydef::Increment, binarydef::RawBytes, 0, 0, cas);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                Vec::new());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let resp = try_response!(resp_packet);
+
+        let mut bufr = BufReader::new(resp.value.as_slice());
+        Ok((try_io!(bufr.read_be_u64()), resp.header.cas))
+    }
+
+    fn decrement_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
+            -> Result<(u64, u64), Error> {
+        let mut extra_buf = MemWriter::with_capacity(20);
+        try_io!(extra_buf.write_be_u64(amount));
+        try_io!(extra_buf.write_be_u64(initial));
+        try_io!(extra_buf.write_be_u32(expiration));
+
+        let req_header = binarydef::RequestHeader::new(binarydef::Decrement, binarydef::RawBytes, 0, 0, cas);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                Vec::new());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let resp = try_response!(resp_packet);
+
+        let mut bufr = BufReader::new(resp.value.as_slice());
+        Ok((try_io!(bufr.read_be_u64()), cas))
+    }
+
+    fn append_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error> {
+        let req_header = binarydef::RequestHeader::new(binarydef::Append, binarydef::RawBytes, 0, 0, cas);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                Vec::new(),
+                                key.to_vec(),
+                                value.to_vec());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+
+        Ok(resp_packet.header.cas)
+    }
+
+    fn prepend_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error> {
+        let req_header = binarydef::RequestHeader::new(binarydef::Prepend, binarydef::RawBytes, 0, 0, cas);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                Vec::new(),
+                                key.to_vec(),
+                                value.to_vec());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+
+        Ok(resp_packet.header.cas)
+    }
+
+    fn touch_cas(&mut self, key: &[u8], expiration: u32, cas: u64) -> Result<u64, Error> {
+        let mut extra_buf = MemWriter::with_capacity(4);
+        try_io!(extra_buf.write_be_u32(expiration));
+
+        let req_header = binarydef::RequestHeader::new(binarydef::Touch, binarydef::RawBytes, 0, 0, cas);
+        let mut req_packet = binarydef::RequestPacket::new(
+                                req_header,
+                                extra_buf.unwrap(),
+                                key.to_vec(),
+                                Vec::new());
+
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let resp_packet = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+
+        Ok(resp_packet.header.cas)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::io::net::ip::Port;
     use std::io::net::tcp::TcpStream;
     use std::collections::TreeMap;
-    use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, BinaryProto};
+    use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation, BinaryProto};
 
     const SERVER_ADDR: &'static str = "127.0.0.1";
     const SERVER_PORT: Port = 11211;
@@ -922,5 +1121,92 @@ mod test {
         assert_eq!(get_resp.unwrap(), (rep_val.to_vec(), 0xcafebabe));
 
         assert!(client.delete(key).is_ok());
+    }
+
+    #[test]
+    fn test_set_add_replace_cas() {
+        let key = b"test:cas_key";
+        let set_val = b"value";
+        let add_val = b"just add";
+        let rep_val = b"replaced";
+
+        let mut client = get_client();
+
+        let add_resp = client.add_cas(key, add_val, 0xdeadbeef, 20);
+        assert!(add_resp.is_ok());
+        let add_cas = add_resp.unwrap();
+
+        {
+            let set_resp = client.set_cas(key, set_val, 0xdeadbeef, 20, add_cas + 1);
+            assert!(set_resp.is_err());
+
+            let get_resp = client.get_cas(key);
+            assert!(get_resp.is_ok());
+            let (_, _, get_cas) = get_resp.unwrap();
+            assert_eq!(get_cas, add_cas);
+
+            let rep_resp = client.replace_cas(key, rep_val, 0xdeadbeef, 20, add_cas + 1);
+            assert!(rep_resp.is_err());
+        }
+
+        {
+            let set_resp = client.set_cas(key, set_val, 0xdeadbeef, 20, add_cas);
+            assert!(set_resp.is_ok());
+            let set_cas = set_resp.unwrap();
+
+            let get_resp = client.get_cas(key);
+            assert!(get_resp.is_ok());
+            let (_, _, get_cas) = get_resp.unwrap();
+            assert_eq!(get_cas, set_cas);
+
+            let rep_resp = client.replace_cas(key, rep_val, 0xdeadbeef, 20, set_cas);
+            assert!(rep_resp.is_ok());
+        }
+    }
+
+    #[test]
+    fn test_incr_decr_cas() {
+        let key = b"test:incr_decr_cas";
+        let mut client = get_client();
+
+        let incr_resp = client.increment_cas(key, 0, 100, 20, 0);
+        assert!(incr_resp.is_ok());
+        let (_, incr_cas) = incr_resp.unwrap();
+
+        let incr_resp = client.increment_cas(key, 0, 10, 20, incr_cas + 1);
+        assert!(incr_resp.is_err());
+
+        let incr_resp = client.increment_cas(key, 0, 10, 20, incr_cas);
+        assert!(incr_resp.is_ok());
+        let (_, incr_cas) = incr_resp.unwrap();
+
+        let decr_resp = client.decrement_cas(key, 0, 10, 20, incr_cas + 1);
+        assert!(decr_resp.is_err());
+
+        let decr_resp = client.decrement_cas(key, 0, 10, 20, incr_cas);
+        assert!(decr_resp.is_ok());
+    }
+
+    #[test]
+    fn test_append_prepend_cas() {
+        let key = b"test:append_prepend_cas";
+        let mut client = get_client();
+
+        let set_resp = client.set_cas(key, b"appended", 0, 20, 0);
+        assert!(set_resp.is_ok());
+        let set_cas = set_resp.unwrap();
+
+        let ap_resp = client.append_cas(key, b"appended", set_cas + 1);
+        assert!(ap_resp.is_err());
+
+        let ap_resp = client.append_cas(key, b"appended", set_cas);
+        assert!(ap_resp.is_ok());
+        let ap_cas = ap_resp.unwrap();
+
+        let pr_resp = client.prepend_cas(key, b"prepend", ap_cas + 1);
+        assert!(pr_resp.is_err());
+
+        let pr_resp = client.prepend_cas(key, b"prepend", ap_cas);
+        assert!(pr_resp.is_ok());
     }
 }

@@ -153,8 +153,8 @@ impl Show for Error {
     }
 }
 
-pub trait Proto: Operation + MultiOperation + ServerOperation + NoReplyOperation {}
-impl<T: Operation + MultiOperation + ServerOperation + NoReplyOperation> Proto for T {}
+pub trait Proto: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation {}
+impl<T: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation> Proto for T {}
 
 pub trait Operation {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error>;
@@ -173,17 +173,16 @@ pub trait Operation {
 pub trait CasOperation {
     fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error>;
     fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<u64, Error>;
-    fn delete_cas(&mut self, key: &[u8], cas: u64) -> Result<u64, Error>;
     fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error>;
     fn get_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, u32, u64), Error>;
     fn getk_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32, u64), Error>;
     fn increment_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
-        -> Result<u64, Error>;
+        -> Result<(u64, u64), Error>;
     fn decrement_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
-        -> Result<u64, Error>;
+        -> Result<(u64, u64), Error>;
     fn append_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error>;
     fn prepend_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error>;
-    fn touch_cas(&mut self, key: &[u8], expiration: u32) -> Result<(), Error>;
+    fn touch_cas(&mut self, key: &[u8], expiration: u32, cas: u64) -> Result<u64, Error>;
 }
 
 pub trait ServerOperation {
