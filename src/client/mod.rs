@@ -21,7 +21,6 @@
 
 //! Memcached client
 
-use std::io::net::ip::Port;
 use std::io::net::tcp::TcpStream;
 use std::io::IoResult;
 use std::collections::{HashMap, TreeMap};
@@ -38,11 +37,11 @@ struct Server {
 }
 
 impl Server {
-    fn connect(addr: &str, port: Port, protocol: proto::ProtoType) -> IoResult<Server> {
+    fn connect(addr: &str, protocol: proto::ProtoType) -> IoResult<Server> {
         Ok(Server {
             proto: match protocol {
                 proto::Binary => {
-                    let stream = try!(TcpStream::connect(addr, port));
+                    let stream = try!(TcpStream::connect(addr));
                     box proto::BinaryProto::new(stream) as Box<Proto + Send>
                 }
             }
@@ -56,7 +55,7 @@ impl Server {
 /// use memcached::client::Client;
 /// use memcached::proto::{Operation, Binary};
 ///
-/// let mut client = Client::connect([("127.0.0.1", 11211, Binary, 1)]);
+/// let mut client = Client::connect([("127.0.0.1:11211", Binary, 1)]);
 /// client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
 /// let (value, flags) = client.get(b"Foo").unwrap();
 ///
@@ -75,13 +74,13 @@ impl Client {
     /// This function accept multiple servers, servers information should be represented
     /// as a array of tuples in this form
     ///
-    /// `(address, port, ProtoType, weight)`.
-    pub fn connect(svrs: &[(&str, Port, proto::ProtoType, uint)]) -> Client {
+    /// `(address, ProtoType, weight)`.
+    pub fn connect(svrs: &[(&str, proto::ProtoType, uint)]) -> Client {
         let mut servers = Vec::new();
         let mut bucket = Vec::new();
-        for &(addr, port, p, weight) in svrs.iter() {
-            servers.push(Arc::new(Mutex::new(Server::connect(addr, port, p).unwrap_or_else(|err| {
-                panic!("Cannot connect server {}:{}: {}", addr, port, err);
+        for &(addr, p, weight) in svrs.iter() {
+            servers.push(Arc::new(Mutex::new(Server::connect(addr, p).unwrap_or_else(|err| {
+                panic!("Cannot connect server {}: {}", addr, err);
             }))));
 
             for _ in range(0, weight) {

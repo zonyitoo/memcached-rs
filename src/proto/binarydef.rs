@@ -618,7 +618,7 @@ mod test {
     use proto::{binarydef, mod};
 
     fn test_stream() -> TcpStream {
-        TcpStream::connect("127.0.0.1", 11211).unwrap()
+        TcpStream::connect("127.0.0.1:11211").unwrap()
     }
 
     #[test]
