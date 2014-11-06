@@ -26,7 +26,7 @@ use std::collections::TreeMap;
 
 use crc32::Crc32;
 
-use proto::{Proto, Operation, MultiOperation, ServerOperation, NoReplyOperation, Error, mod};
+use proto::{Proto, Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation, Error, mod};
 
 struct Server {
     pub proto: Box<Proto + Send>,
@@ -208,5 +208,59 @@ impl NoReplyOperation for Client {
     fn prepend_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
         let server = self.find_server_by_key(key);
         server.proto.prepend_noreply(key, value)
+    }
+}
+
+impl CasOperation for Client {
+    fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.set_cas(key, value, flags, expiration, cas)
+    }
+
+    fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<u64, Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.add_cas(key, value, flags, expiration)
+    }
+
+    fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.replace_cas(key, value, flags, expiration, cas)
+    }
+
+    fn get_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, u32, u64), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.get_cas(key)
+    }
+
+    fn getk_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32, u64), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.getk_cas(key)
+    }
+
+    fn increment_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
+            -> Result<(u64, u64), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.increment_cas(key, amount, initial, expiration, cas)
+    }
+
+    fn decrement_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
+            -> Result<(u64, u64), Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.decrement_cas(key, amount, initial, expiration, cas)
+    }
+
+    fn append_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.append_cas(key, value, cas)
+    }
+
+    fn prepend_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.prepend_cas(key, value, cas)
+    }
+
+    fn touch_cas(&mut self, key: &[u8], expiration: u32, cas: u64) -> Result<u64, Error> {
+        let server = self.find_server_by_key(key);
+        server.proto.touch_cas(key, expiration, cas)
     }
 }
