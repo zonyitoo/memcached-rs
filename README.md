@@ -12,7 +12,7 @@ extern crate memcached;
 use std::collections::TreeMap;
 
 use memcached::client::Client;
-use memcached::proto::{Operation, Binary};
+use memcached::proto::{Operation, MultiOperation, NoReplyOperation, CasOperation, Binary};
 
 fn main() {
     let mut client = Client::connect([("127.0.0.1:11211", Binary, 1)]);
@@ -23,13 +23,13 @@ fn main() {
     assert_eq!(flags, 0xdeadbeef);
 
     let mut data = TreeMap::new();
-    data.insert(b"key1".to_vec(), (b"val1", 0xdeadbeef, 10));
-    data.insert(b"key2".to_vec(), (b"val2", 0xcafebabe, 20));
+    data.insert(b"key1".to_vec(), (b"val1".to_vec(), 0xdeadbeef, 10));
+    data.insert(b"key2".to_vec(), (b"val2".to_vec(), 0xcafebabe, 20));
     client.set_multi(data).unwrap();
 
     client.set_noreply(b"key:dontreply", b"1", 0x00000001, 20).unwrap();
 
-    let cas_val = client.increment_cas(b"key:numerical", 10, 1, 20, 0).unwrap();
+    let (_, cas_val) = client.increment_cas(b"key:numerical", 10, 1, 20, 0).unwrap();
     client.increment_cas(b"key:numerical", 1, 1, 20, cas_val).unwrap();
 }
 ```
