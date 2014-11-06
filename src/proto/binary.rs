@@ -870,7 +870,7 @@ mod test {
     #[test]
     fn test_set_get_delete() {
         let mut client = get_client();
-        assert!(client.set(b"test:Hello", b"world", 0xdeadbeef, 20).is_ok());
+        assert!(client.set(b"test:Hello", b"world", 0xdeadbeef, 120).is_ok());
 
         let get_resp = client.get(b"test:Hello");
         assert!(get_resp.is_ok());
@@ -887,25 +887,25 @@ mod test {
     fn test_incr_decr() {
         let mut client = get_client();
         {
-            let incr_resp = client.increment(b"test:incr", 1, 0, 20);
+            let incr_resp = client.increment(b"test:incr", 1, 0, 120);
             assert!(incr_resp.is_ok());
             assert_eq!(incr_resp.unwrap(), 0);
         }
 
         {
-            let incr_resp = client.increment(b"test:incr", 10, 0, 20);
+            let incr_resp = client.increment(b"test:incr", 10, 0, 120);
             assert!(incr_resp.is_ok());
             assert_eq!(incr_resp.unwrap(), 10);
         }
 
         {
-            let decr_resp = client.decrement(b"test:incr", 5, 0, 20);
+            let decr_resp = client.decrement(b"test:incr", 5, 0, 120);
             assert!(decr_resp.is_ok());
             assert_eq!(decr_resp.unwrap(), 5);
         }
 
         {
-            let decr_resp = client.decrement(b"test:incr", 20, 0, 20);
+            let decr_resp = client.decrement(b"test:incr", 20, 0, 120);
             assert!(decr_resp.is_ok());
             assert_eq!(decr_resp.unwrap(), 0);
         }
@@ -946,7 +946,7 @@ mod test {
         let mut client = get_client();
 
         {
-            let add_resp = client.add(b"test:add_key", b"initial", 0xdeadbeef, 20);
+            let add_resp = client.add(b"test:add_key", b"initial", 0xdeadbeef, 120);
             assert!(add_resp.is_ok());
         }
 
@@ -955,7 +955,7 @@ mod test {
             assert!(get_resp.is_ok());
 
             assert_eq!(get_resp.unwrap(), (b"initial".to_vec(), 0xdeadbeef));
-            let add_resp = client.add(b"test:add_key", b"added", 0xdeadbeef, 20);
+            let add_resp = client.add(b"test:add_key", b"added", 0xdeadbeef, 120);
             assert!(add_resp.is_err());
         }
 
@@ -967,14 +967,14 @@ mod test {
         let mut client = get_client();
 
         {
-            let rep_resp = client.replace(b"test:replace_key", b"replaced", 0xdeadbeef, 20);
+            let rep_resp = client.replace(b"test:replace_key", b"replaced", 0xdeadbeef, 120);
             assert!(rep_resp.is_err());
         }
 
         {
-            let add_resp = client.add(b"test:replace_key", b"just_add", 0xdeadbeef, 20);
+            let add_resp = client.add(b"test:replace_key", b"just_add", 0xdeadbeef, 120);
             assert!(add_resp.is_ok());
-            let rep_resp = client.replace(b"test:replace_key", b"replaced", 0xdeadbeef, 20);
+            let rep_resp = client.replace(b"test:replace_key", b"replaced", 0xdeadbeef, 120);
             assert!(rep_resp.is_ok());
             assert!(client.delete(b"test:replace_key").is_ok());
         }
@@ -991,7 +991,7 @@ mod test {
         }
 
         {
-            let add_resp = client.add(b"test:append_key", b"just_add", 0xdeadbeef, 20);
+            let add_resp = client.add(b"test:append_key", b"just_add", 0xdeadbeef, 120);
             assert!(add_resp.is_ok());
 
             let app_resp = client.append(b"test:append_key", b"appended");
@@ -1021,13 +1021,13 @@ mod test {
     fn test_touch() {
         let mut client = get_client();
 
-        let touch_resp = client.touch(b"test:touch", 20);
+        let touch_resp = client.touch(b"test:touch", 120);
         assert!(touch_resp.is_err());
 
         let add_resp = client.add(b"test:touch", b"val", 0xcafebabe, 100);
         assert!(add_resp.is_ok());
 
-        let touch_resp = client.touch(b"test:touch", 20);
+        let touch_resp = client.touch(b"test:touch", 120);
         assert!(touch_resp.is_ok());
     }
 
@@ -1036,9 +1036,9 @@ mod test {
         let mut client = get_client();
 
         let mut data = TreeMap::new();
-        data.insert(b"test:multi_hello1".to_vec(), (b"world1".to_vec(), 0xdeadbeef, 20));
-        data.insert(b"test:multi_hello2".to_vec(), (b"world2".to_vec(), 0xdeadbeef, 20));
-        data.insert(b"test:multi_lastone".to_vec(), (b"last!".to_vec(), 0xdeadbeef, 20));
+        data.insert(b"test:multi_hello1".to_vec(), (b"world1".to_vec(), 0xdeadbeef, 120));
+        data.insert(b"test:multi_hello2".to_vec(), (b"world2".to_vec(), 0xdeadbeef, 120));
+        data.insert(b"test:multi_lastone".to_vec(), (b"last!".to_vec(), 0xdeadbeef, 120));
 
         let set_resp = client.set_multi(data);
         assert!(set_resp.is_ok());
@@ -1087,21 +1087,21 @@ mod test {
 
         let mut client = get_client();
 
-        let add_resp = client.add_noreply(key, add_val, 0xdeadbeef, 20);
+        let add_resp = client.add_noreply(key, add_val, 0xdeadbeef, 120);
         assert!(add_resp.is_ok());
 
         let get_resp = client.get(key);
         assert!(get_resp.is_ok());
         assert_eq!(get_resp.unwrap(), (add_val.to_vec(), 0xdeadbeef));
 
-        let set_resp = client.set_noreply(key, set_val, 0xdeadbeef, 20);
+        let set_resp = client.set_noreply(key, set_val, 0xdeadbeef, 120);
         assert!(set_resp.is_ok());
 
         let get_resp = client.get(key);
         assert!(get_resp.is_ok());
         assert_eq!(get_resp.unwrap(), (set_val.to_vec(), 0xdeadbeef));
 
-        let rep_resp = client.replace_noreply(key, rep_val, 0xcafebabe, 20);
+        let rep_resp = client.replace_noreply(key, rep_val, 0xcafebabe, 120);
         assert!(rep_resp.is_ok());
 
         let get_resp = client.get(key);
@@ -1120,12 +1120,12 @@ mod test {
 
         let mut client = get_client();
 
-        let add_resp = client.add_cas(key, add_val, 0xdeadbeef, 20);
+        let add_resp = client.add_cas(key, add_val, 0xdeadbeef, 120);
         assert!(add_resp.is_ok());
         let add_cas = add_resp.unwrap();
 
         {
-            let set_resp = client.set_cas(key, set_val, 0xdeadbeef, 20, add_cas + 1);
+            let set_resp = client.set_cas(key, set_val, 0xdeadbeef, 120, add_cas + 1);
             assert!(set_resp.is_err());
 
             let get_resp = client.get_cas(key);
@@ -1133,12 +1133,12 @@ mod test {
             let (_, _, get_cas) = get_resp.unwrap();
             assert_eq!(get_cas, add_cas);
 
-            let rep_resp = client.replace_cas(key, rep_val, 0xdeadbeef, 20, add_cas + 1);
+            let rep_resp = client.replace_cas(key, rep_val, 0xdeadbeef, 120, add_cas + 1);
             assert!(rep_resp.is_err());
         }
 
         {
-            let set_resp = client.set_cas(key, set_val, 0xdeadbeef, 20, add_cas);
+            let set_resp = client.set_cas(key, set_val, 0xdeadbeef, 120, add_cas);
             assert!(set_resp.is_ok());
             let set_cas = set_resp.unwrap();
 
@@ -1147,7 +1147,7 @@ mod test {
             let (_, _, get_cas) = get_resp.unwrap();
             assert_eq!(get_cas, set_cas);
 
-            let rep_resp = client.replace_cas(key, rep_val, 0xdeadbeef, 20, set_cas);
+            let rep_resp = client.replace_cas(key, rep_val, 0xdeadbeef, 120, set_cas);
             assert!(rep_resp.is_ok());
         }
     }
@@ -1157,21 +1157,21 @@ mod test {
         let key = b"test:incr_decr_cas";
         let mut client = get_client();
 
-        let incr_resp = client.increment_cas(key, 0, 100, 20, 0);
+        let incr_resp = client.increment_cas(key, 0, 100, 120, 0);
         assert!(incr_resp.is_ok());
         let (_, incr_cas) = incr_resp.unwrap();
 
-        let incr_resp = client.increment_cas(key, 0, 10, 20, incr_cas + 1);
+        let incr_resp = client.increment_cas(key, 0, 10, 120, incr_cas + 1);
         assert!(incr_resp.is_err());
 
-        let incr_resp = client.increment_cas(key, 0, 10, 20, incr_cas);
+        let incr_resp = client.increment_cas(key, 0, 10, 120, incr_cas);
         assert!(incr_resp.is_ok());
         let (_, incr_cas) = incr_resp.unwrap();
 
-        let decr_resp = client.decrement_cas(key, 0, 10, 20, incr_cas + 1);
+        let decr_resp = client.decrement_cas(key, 0, 10, 120, incr_cas + 1);
         assert!(decr_resp.is_err());
 
-        let decr_resp = client.decrement_cas(key, 0, 10, 20, incr_cas);
+        let decr_resp = client.decrement_cas(key, 0, 10, 120, incr_cas);
         assert!(decr_resp.is_ok());
     }
 
@@ -1180,7 +1180,7 @@ mod test {
         let key = b"test:append_prepend_cas";
         let mut client = get_client();
 
-        let set_resp = client.set_cas(key, b"appended", 0, 20, 0);
+        let set_resp = client.set_cas(key, b"appended", 0, 120, 0);
         assert!(set_resp.is_ok());
         let set_cas = set_resp.unwrap();
 
