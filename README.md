@@ -15,7 +15,7 @@ use memcached::client::Client;
 use memcached::proto::{Operation, MultiOperation, NoReplyOperation, CasOperation, Binary};
 
 fn main() {
-    let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+    let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 
     client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
     let (value, flags) = client.get(b"Foo").unwrap();
@@ -35,6 +35,10 @@ fn main() {
 ```
 
 Run `cargo doc --open` for more details.
+
+## TODO
+
+* Auto-disable failed servers
 
 ## License
 

@@ -61,7 +61,7 @@ impl Clone for Server {
 /// use memcached::client::Client;
 /// use memcached::proto::{Operation, MultiOperation, NoReplyOperation, CasOperation, Binary};
 ///
-/// let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+/// let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 ///
 /// client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
 /// let (value, flags) = client.get(b"Foo").unwrap();
@@ -434,10 +434,9 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(64);
 
-        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 
         b.iter(|| client.set(key, val.as_slice(), 0, 2));
-        b.bytes = 64;
     }
 
     #[bench]
@@ -445,10 +444,9 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(64);
 
-        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
-        b.bytes = 64;
     }
 
     #[bench]
@@ -456,10 +454,9 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(512);
 
-        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 
         b.iter(|| client.set(key, val.as_slice(), 0, 2));
-        b.bytes = 512;
     }
 
     #[bench]
@@ -467,10 +464,9 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(512);
 
-        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
-        b.bytes = 512;
     }
 
     #[bench]
@@ -478,10 +474,9 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(1024);
 
-        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 
         b.iter(|| client.set(key, val.as_slice(), 0, 2));
-        b.bytes = 1024;
     }
 
     #[bench]
@@ -489,10 +484,9 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(1024);
 
-        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
-        b.bytes = 1024;
     }
 
     #[bench]
@@ -500,10 +494,9 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(4096);
 
-        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 
         b.iter(|| client.set(key, val.as_slice(), 0, 2));
-        b.bytes = 4096;
     }
 
     #[bench]
@@ -511,10 +504,9 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(4096);
 
-        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
-        b.bytes = 4096;
     }
 
     #[bench]
@@ -522,10 +514,9 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(16384);
 
-        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 
         b.iter(|| client.set(key, val.as_slice(), 0, 2));
-        b.bytes = 16384;
     }
 
     #[bench]
@@ -533,9 +524,8 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(16384);
 
-        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary);
+        let mut client = Client::connect([("127.0.0.1:11211", 1)], Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
-        b.bytes = 16384;
     }
 }

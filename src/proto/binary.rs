@@ -24,6 +24,7 @@ use std::io::net::tcp::TcpStream;
 use std::string::String;
 use std::str;
 use std::collections::TreeMap;
+use std::rand::random;
 
 use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation};
 use proto::{Error, OtherError, binarydef, mod};
@@ -96,8 +97,9 @@ impl BinaryProto {
         }
     }
 
-    fn send_noop(&mut self) -> Result<(), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Noop, binarydef::RawBytes, 0, 0, 0);
+    fn send_noop(&mut self) -> Result<u32, Error> {
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::Noop, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -107,17 +109,18 @@ impl BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        Ok(())
+        Ok(opaque)
     }
 }
 
 impl Operation for BinaryProto {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
         try_io!(extra_buf.write_be_u32(flags));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Set, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::Set, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -127,18 +130,21 @@ impl Operation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         try_response!(resp_packet);
         Ok(())
     }
 
     fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
         try_io!(extra_buf.write_be_u32(flags));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Add, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::Add, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -148,14 +154,17 @@ impl Operation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         try_response!(resp_packet);
         Ok(())
     }
 
     fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Delete, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::Delete, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -165,18 +174,21 @@ impl Operation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         try_response!(resp_packet);
         Ok(())
     }
 
     fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
         try_io!(extra_buf.write_be_u32(flags));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Replace, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::Replace, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -186,14 +198,17 @@ impl Operation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         try_response!(resp_packet);
         Ok(())
     }
 
     fn get(&mut self, key: &[u8]) -> Result<(Vec<u8>, u32), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Get, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::Get, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -203,7 +218,10 @@ impl Operation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         let resp = try_response!(resp_packet);
 
         let mut extrabufr = BufReader::new(resp.extra.as_slice());
@@ -213,7 +231,8 @@ impl Operation for BinaryProto {
     }
 
     fn getk(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::GetKey, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::GetKey, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -223,7 +242,10 @@ impl Operation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         let resp = try_response!(resp_packet);
 
         let mut extrabufr = BufReader::new(resp.extra.as_slice());
@@ -233,12 +255,13 @@ impl Operation for BinaryProto {
     }
 
     fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(20);
         try_io!(extra_buf.write_be_u64(amount));
         try_io!(extra_buf.write_be_u64(initial));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Increment, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::Increment, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -248,7 +271,10 @@ impl Operation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         let resp = try_response!(resp_packet);
 
         let mut bufr = BufReader::new(resp.value.as_slice());
@@ -256,12 +282,13 @@ impl Operation for BinaryProto {
     }
 
     fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(20);
         try_io!(extra_buf.write_be_u64(amount));
         try_io!(extra_buf.write_be_u64(initial));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Decrement, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::Decrement, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -271,7 +298,10 @@ impl Operation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         let resp = try_response!(resp_packet);
 
         let mut bufr = BufReader::new(resp.value.as_slice());
@@ -279,7 +309,8 @@ impl Operation for BinaryProto {
     }
 
     fn append(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Append, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::Append, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -289,15 +320,18 @@ impl Operation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         try_response!(resp_packet);
 
         Ok(())
     }
 
     fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Prepend, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::Prepend, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -307,18 +341,21 @@ impl Operation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         try_response!(resp_packet);
 
         Ok(())
     }
 
     fn touch(&mut self, key: &[u8], expiration: u32) -> Result<(), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(4);
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Touch, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::Touch, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -328,8 +365,10 @@ impl Operation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         try_response!(resp_packet);
 
         Ok(())
@@ -338,7 +377,8 @@ impl Operation for BinaryProto {
 
 impl ServerOperation for BinaryProto {
     fn quit(&mut self) -> Result<(), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Quit, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::Quit, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -348,18 +388,21 @@ impl ServerOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         try_response!(resp_packet);
 
         Ok(())
     }
 
     fn flush(&mut self, expiration: u32) -> Result<(), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(4);
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Flush, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::Flush, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -369,22 +412,28 @@ impl ServerOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         try_response!(resp_packet);
         Ok(())
     }
 
     fn noop(&mut self) -> Result<(), Error> {
-        try!(self.send_noop());
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let opaque = try!(self.send_noop());
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         try_response!(resp_packet);
 
         Ok(())
     }
 
     fn version(&mut self) -> Result<Version, Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Version, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::Version, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -394,7 +443,10 @@ impl ServerOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
 
         let val = try_response!(resp_packet).value;
         let verstr = match str::from_utf8(val.as_slice()) {
@@ -409,7 +461,8 @@ impl ServerOperation for BinaryProto {
     }
 
     fn stat(&mut self) -> Result<TreeMap<String, String>, Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Stat, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::Stat, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -422,6 +475,9 @@ impl ServerOperation for BinaryProto {
         let mut result = TreeMap::new();
         loop {
             let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+            if resp_packet.header.opaque != opaque {
+                continue;
+            }
             let resp = try_response!(resp_packet);
 
             if resp.key.len() == 0 && resp.value.len() == 0 {
@@ -527,11 +583,12 @@ impl MultiOperation for BinaryProto {
 
 impl NoReplyOperation for BinaryProto {
     fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
         try_io!(extra_buf.write_be_u32(flags));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::SetQuietly, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::SetQuietly, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -545,11 +602,12 @@ impl NoReplyOperation for BinaryProto {
     }
 
     fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
         try_io!(extra_buf.write_be_u32(flags));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::AddQuietly, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::AddQuietly, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -563,7 +621,8 @@ impl NoReplyOperation for BinaryProto {
     }
 
     fn delete_noreply(&mut self, key: &[u8]) -> Result<(), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::DeleteQuietly, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::DeleteQuietly, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -577,11 +636,12 @@ impl NoReplyOperation for BinaryProto {
     }
 
     fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
         try_io!(extra_buf.write_be_u32(flags));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::ReplaceQuietly, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::ReplaceQuietly, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -595,12 +655,13 @@ impl NoReplyOperation for BinaryProto {
     }
 
     fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(20);
         try_io!(extra_buf.write_be_u64(amount));
         try_io!(extra_buf.write_be_u64(initial));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::IncrementQuietly, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::IncrementQuietly, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -614,12 +675,13 @@ impl NoReplyOperation for BinaryProto {
     }
 
     fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(20);
         try_io!(extra_buf.write_be_u64(amount));
         try_io!(extra_buf.write_be_u64(initial));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::DecrementQuietly, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::DecrementQuietly, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -633,7 +695,8 @@ impl NoReplyOperation for BinaryProto {
     }
 
     fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::AppendQuietly, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::AppendQuietly, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -647,7 +710,8 @@ impl NoReplyOperation for BinaryProto {
     }
 
     fn prepend_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::PrependQuietly, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::PrependQuietly, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -663,11 +727,12 @@ impl NoReplyOperation for BinaryProto {
 
 impl CasOperation for BinaryProto {
     fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
         try_io!(extra_buf.write_be_u32(flags));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Set, binarydef::RawBytes, 0, 0, cas);
+        let req_header = binarydef::RequestHeader::new(binarydef::Set, binarydef::RawBytes, 0, opaque, cas);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -677,17 +742,21 @@ impl CasOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         let resp = try_response!(resp_packet);
         Ok(resp.header.cas)
     }
 
     fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<u64, Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
         try_io!(extra_buf.write_be_u32(flags));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Add, binarydef::RawBytes, 0, 0, 0);
+        let req_header = binarydef::RequestHeader::new(binarydef::Add, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -697,16 +766,21 @@ impl CasOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
-        Ok(resp_packet.header.cas)
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
+        let resp = try_response!(resp_packet);
+        Ok(resp.header.cas)
     }
 
     fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
         try_io!(extra_buf.write_be_u32(flags));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Replace, binarydef::RawBytes, 0, 0, cas);
+        let req_header = binarydef::RequestHeader::new(binarydef::Replace, binarydef::RawBytes, 0, opaque, cas);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -716,12 +790,17 @@ impl CasOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
-        Ok(resp_packet.header.cas)
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
+        let resp = try_response!(resp_packet);
+        Ok(resp.header.cas)
     }
 
     fn get_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, u32, u64), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Get, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::Get, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -731,7 +810,10 @@ impl CasOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         let resp = try_response!(resp_packet);
 
         let mut extrabufr = BufReader::new(resp.extra.as_slice());
@@ -741,7 +823,8 @@ impl CasOperation for BinaryProto {
     }
 
     fn getk_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32, u64), Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::GetKey, binarydef::RawBytes, 0, 0, 0);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::GetKey, binarydef::RawBytes, 0, opaque, 0);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -751,7 +834,10 @@ impl CasOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         let resp = try_response!(resp_packet);
 
         let mut extrabufr = BufReader::new(resp.extra.as_slice());
@@ -762,12 +848,13 @@ impl CasOperation for BinaryProto {
 
     fn increment_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
             -> Result<(u64, u64), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(20);
         try_io!(extra_buf.write_be_u64(amount));
         try_io!(extra_buf.write_be_u64(initial));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Increment, binarydef::RawBytes, 0, 0, cas);
+        let req_header = binarydef::RequestHeader::new(binarydef::Increment, binarydef::RawBytes, 0, opaque, cas);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -777,7 +864,10 @@ impl CasOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         let resp = try_response!(resp_packet);
 
         let mut bufr = BufReader::new(resp.value.as_slice());
@@ -786,12 +876,13 @@ impl CasOperation for BinaryProto {
 
     fn decrement_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
             -> Result<(u64, u64), Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(20);
         try_io!(extra_buf.write_be_u64(amount));
         try_io!(extra_buf.write_be_u64(initial));
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Decrement, binarydef::RawBytes, 0, 0, cas);
+        let req_header = binarydef::RequestHeader::new(binarydef::Decrement, binarydef::RawBytes, 0, opaque, cas);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -801,7 +892,10 @@ impl CasOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
         let resp = try_response!(resp_packet);
 
         let mut bufr = BufReader::new(resp.value.as_slice());
@@ -809,7 +903,8 @@ impl CasOperation for BinaryProto {
     }
 
     fn append_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Append, binarydef::RawBytes, 0, 0, cas);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::Append, binarydef::RawBytes, 0, opaque, cas);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -819,13 +914,18 @@ impl CasOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
+        let resp = try_response!(resp_packet);
 
-        Ok(resp_packet.header.cas)
+        Ok(resp.header.cas)
     }
 
     fn prepend_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error> {
-        let req_header = binarydef::RequestHeader::new(binarydef::Prepend, binarydef::RawBytes, 0, 0, cas);
+        let opaque = random::<u32>();
+        let req_header = binarydef::RequestHeader::new(binarydef::Prepend, binarydef::RawBytes, 0, opaque, cas);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 Vec::new(),
@@ -835,16 +935,21 @@ impl CasOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
+        let resp = try_response!(resp_packet);
 
-        Ok(resp_packet.header.cas)
+        Ok(resp.header.cas)
     }
 
     fn touch_cas(&mut self, key: &[u8], expiration: u32, cas: u64) -> Result<u64, Error> {
+        let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(4);
         try_io!(extra_buf.write_be_u32(expiration));
 
-        let req_header = binarydef::RequestHeader::new(binarydef::Touch, binarydef::RawBytes, 0, 0, cas);
+        let req_header = binarydef::RequestHeader::new(binarydef::Touch, binarydef::RawBytes, 0, opaque, cas);
         let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 extra_buf.unwrap(),
@@ -854,9 +959,13 @@ impl CasOperation for BinaryProto {
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let resp_packet = try_response!(try_io!(binarydef::ResponsePacket::read_from(&mut self.stream)));
+        let mut resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
+        }
+        let resp = try_response!(resp_packet);
 
-        Ok(resp_packet.header.cas)
+        Ok(resp.header.cas)
     }
 }
 
@@ -937,8 +1046,7 @@ mod test {
         let mut client = get_client();
         assert!(client.quit().is_ok());
 
-        let mut client = get_client();
-        assert!(client.noop().is_err());
+        client.noop().unwrap();
     }
 
     #[test]
@@ -1035,6 +1143,8 @@ mod test {
 
         let touch_resp = client.touch(b"test:touch", 120);
         assert!(touch_resp.is_ok());
+
+        assert!(client.delete(b"test:touch").is_ok());
     }
 
     #[test]
@@ -1156,6 +1266,8 @@ mod test {
             let rep_resp = client.replace_cas(key, rep_val, 0xdeadbeef, 120, set_cas);
             assert!(rep_resp.is_ok());
         }
+
+        assert!(client.delete(key).is_ok());
     }
 
     #[test]
@@ -1179,6 +1291,8 @@ mod test {
 
         let decr_resp = client.decrement_cas(key, 0, 10, 120, incr_cas);
         assert!(decr_resp.is_ok());
+
+        assert!(client.delete(key).is_ok());
     }
 
     #[test]
@@ -1202,5 +1316,27 @@ mod test {
 
         let pr_resp = client.prepend_cas(key, b"prepend", ap_cas);
         assert!(pr_resp.is_ok());
+
+        assert!(client.delete(key).is_ok());
+    }
+
+    #[test]
+    fn test_if_noreply_failed() {
+        let key = b"test:noreply_fail_key";
+        let set_val = b"value";
+        let add_val = b"just add";
+
+        let mut client = get_client();
+
+        let set_resp = client.set_noreply(key, set_val, 0xdeadbeef, 120);
+        assert!(set_resp.is_ok());
+
+        // Should failed, because key is already set
+        let add_resp = client.add_noreply(key, add_val, 0xdeadbeef, 120);
+        assert!(add_resp.is_ok());
+
+        let get_resp = client.get(key);
+        assert!(get_resp.is_ok());
+        assert_eq!(get_resp.unwrap(), (set_val.to_vec(), 0xdeadbeef));
     }
 }

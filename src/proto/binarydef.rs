@@ -630,7 +630,7 @@ mod test {
             let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 vec![0xde, 0xad, 0xbe, 0xef, 0x00, 0x00, 0x0e, 0x10],
-                                b"hello".to_vec(),
+                                b"test:binary_proto:hello".to_vec(),
                                 b"world".to_vec());
 
             req_packet.write_to(&mut stream).unwrap();
@@ -646,7 +646,7 @@ mod test {
             let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 vec![],
-                                b"hello".to_vec(),
+                                b"test:binary_proto:hello".to_vec(),
                                 vec![]);
 
             req_packet.write_to(&mut stream).unwrap();
@@ -663,7 +663,7 @@ mod test {
             let mut req_packet = binarydef::RequestPacket::new(
                                 req_header,
                                 vec![],
-                                b"hello".to_vec(),
+                                b"test:binary_proto:hello".to_vec(),
                                 vec![]);
 
             req_packet.write_to(&mut stream).unwrap();
