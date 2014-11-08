@@ -51,88 +51,176 @@
 
 use std::io::{Writer, Reader, IoResult, IoError, OtherIoError};
 
-use proto::Status;
+const MAGIC_REQUEST: u8 = 0x80;
+const MAGIC_RESPONSE: u8 = 0x81;
 
-pub const MAGIC_REQUEST: u8 = 0x80;
-pub const MAGIC_RESPONSE: u8 = 0x81;
+const STATUS_NO_ERROR: u16 = 0x0000;
+const STATUS_KEY_NOT_FOUND: u16 = 0x0001;
+const STATUS_KEY_EXISTS: u16 = 0x0002;
+const STATUS_VALUE_TOO_LARGE: u16 = 0x0003;
+const STATUS_INVALID_ARGUMENTS: u16 = 0x0004;
+const STATUS_ITEM_NOT_STORED: u16 = 0x0005;
+const STATUS_INCR_OR_DECR_ON_NON_NUMERIC_VALUE: u16 = 0x0006;
+const STATUS_VBUCKET_BELONGS_TO_OTHER_SERVER: u16 = 0x0007;
+const STATUS_AUTHENTICATION_ERROR: u16 = 0x0008;
+const STATUS_AUTHENTICATION_CONTINUE: u16 = 0x0009;
+const STATUS_UNKNOWN_COMMAND: u16 = 0x0081;
+const STATUS_OUT_OF_MEMORY: u16 = 0x0082;
+const STATUS_NOT_SUPPORTED: u16 = 0x0083;
+const STATUS_INTERNAL_ERROR: u16 = 0x0084;
+const STATUS_BUSY: u16 = 0x0085;
+const STATUS_TEMPORARY_FAILURE: u16 = 0x0086;
 
-pub const STATUS_NO_ERROR: u16 = 0x0000;
-pub const STATUS_KEY_NOT_FOUND: u16 = 0x0001;
-pub const STATUS_KEY_EXISTS: u16 = 0x0002;
-pub const STATUS_VALUE_TOO_LARGE: u16 = 0x0003;
-pub const STATUS_INVALID_ARGUMENTS: u16 = 0x0004;
-pub const STATUS_ITEM_NOT_STORED: u16 = 0x0005;
-pub const STATUS_INCR_OR_DECR_ON_NON_NUMERIC_VALUE: u16 = 0x0006;
-pub const STATUS_VBUCKET_BELONGS_TO_OTHER_SERVER: u16 = 0x0007;
-pub const STATUS_AUTHENTICATION_ERROR: u16 = 0x0008;
-pub const STATUS_AUTHENTICATION_CONTINUE: u16 = 0x0009;
-pub const STATUS_UNKNOWN_COMMAND: u16 = 0x0081;
-pub const STATUS_OUT_OF_MEMORY: u16 = 0x0082;
-pub const STATUS_NOT_SUPPORTED: u16 = 0x0083;
-pub const STATUS_INTERNAL_ERROR: u16 = 0x0084;
-pub const STATUS_BUSY: u16 = 0x0085;
-pub const STATUS_TEMPORARY_FAILURE: u16 = 0x0086;
+const OPCODE_GET: u8 = 0x00;
+const OPCODE_SET: u8 = 0x01;
+const OPCODE_ADD: u8 = 0x02;
+const OPCODE_REPLACE: u8 = 0x03;
+const OPCODE_DEL: u8 = 0x04;
+const OPCODE_INCR: u8 = 0x05;
+const OPCODE_DECR: u8 = 0x06;
+const OPCODE_QUIT: u8 = 0x07;
+const OPCODE_FLUSH: u8 = 0x08;
+const OPCODE_GETQ: u8 = 0x09;
+const OPCODE_NOP: u8 = 0x0A;
+const OPCODE_VERSION: u8 = 0x0B;
+const OPCODE_GETK: u8 = 0x0C;
+const OPCODE_GETKQ: u8 = 0x0D;
+const OPCODE_APPEND: u8 = 0x0E;
+const OPCODE_PREPEND: u8 = 0x0F;
+const OPCODE_STAT: u8 = 0x10;
+const OPCODE_SETQ: u8 = 0x11;
+const OPCODE_ADDQ: u8 = 0x12;
+const OPCODE_REPLACEQ: u8 = 0x13;
+const OPCODE_DELQ: u8 = 0x14;
+const OPCODE_INCRQ: u8 = 0x15;
+const OPCODE_DECRQ: u8 = 0x16;
+const OPCODE_QUITQ: u8 = 0x17;
+const OPCODE_FLUSHQ: u8 = 0x18;
+const OPCODE_APPENDQ: u8 = 0x19;
+const OPCODE_PREPENDQ: u8 = 0x1A;
+const OPCODE_VERBOSITY: u8 = 0x1B;
+const OPCODE_TOUCH: u8 = 0x1C;
+const OPCODE_GAT: u8 = 0x1D;
+const OPCODE_GATQ: u8 = 0x1E;
+const OPCODE_SASL_LIST_MECHS: u8 = 0x20;
+const OPCODE_SASL_AUTH: u8 = 0x21;
+const OPCODE_SASL_STEP: u8 = 0x22;
+const OPCODE_RGET: u8 = 0x30;
+const OPCODE_RSET: u8 = 0x31;
+const OPCODE_RSETQ: u8 = 0x32;
+const OPCODE_RAPPEND: u8 = 0x33;
+const OPCODE_RAPPENDQ: u8 = 0x34;
+const OPCODE_RPREPEND: u8 = 0x35;
+const OPCODE_RPREPENDQ: u8 = 0x36;
+const OPCODE_RDEL: u8 = 0x37;
+const OPCODE_RDELQ: u8 = 0x38;
+const OPCODE_RINCR: u8 = 0x39;
+const OPCODE_RINCRQ: u8 = 0x3A;
+const OPCODE_RDECR: u8 = 0x3B;
+const OPCODE_RDECRQ: u8 = 0x3C;
+const OPCODE_SET_VBUCKET: u8 = 0x3D;
+const OPCODE_GET_VBUCKET: u8 = 0x3E;
+const OPCODE_DEL_VBUCKET: u8 = 0x3F;
+const OPCODE_TAP_CONNECT: u8 = 0x40;
+const OPCODE_TAP_MUTATION: u8 = 0x41;
+const OPCODE_TAP_DEL: u8 = 0x42;
+const OPCODE_TAP_FLUSH: u8 = 0x43;
+const OPCODE_TAP_OPAQUE: u8 = 0x44;
+const OPCODE_TAP_VBUCKET_SET: u8 = 0x45;
+const OPCODE_TAP_CHECKPOINT_START: u8 = 0x46;
+const OPCODE_TAP_CHECKPOINT_END: u8 = 0x47;
 
-pub const OPCODE_GET: u8 = 0x00;
-pub const OPCODE_SET: u8 = 0x01;
-pub const OPCODE_ADD: u8 = 0x02;
-pub const OPCODE_REPLACE: u8 = 0x03;
-pub const OPCODE_DEL: u8 = 0x04;
-pub const OPCODE_INCR: u8 = 0x05;
-pub const OPCODE_DECR: u8 = 0x06;
-pub const OPCODE_QUIT: u8 = 0x07;
-pub const OPCODE_FLUSH: u8 = 0x08;
-pub const OPCODE_GETQ: u8 = 0x09;
-pub const OPCODE_NOP: u8 = 0x0A;
-pub const OPCODE_VERSION: u8 = 0x0B;
-pub const OPCODE_GETK: u8 = 0x0C;
-pub const OPCODE_GETKQ: u8 = 0x0D;
-pub const OPCODE_APPEND: u8 = 0x0E;
-pub const OPCODE_PREPEND: u8 = 0x0F;
-pub const OPCODE_STAT: u8 = 0x10;
-pub const OPCODE_SETQ: u8 = 0x11;
-pub const OPCODE_ADDQ: u8 = 0x12;
-pub const OPCODE_REPLACEQ: u8 = 0x13;
-pub const OPCODE_DELQ: u8 = 0x14;
-pub const OPCODE_INCRQ: u8 = 0x15;
-pub const OPCODE_DECRQ: u8 = 0x16;
-pub const OPCODE_QUITQ: u8 = 0x17;
-pub const OPCODE_FLUSHQ: u8 = 0x18;
-pub const OPCODE_APPENDQ: u8 = 0x19;
-pub const OPCODE_PREPENDQ: u8 = 0x1A;
-pub const OPCODE_VERBOSITY: u8 = 0x1B;
-pub const OPCODE_TOUCH: u8 = 0x1C;
-pub const OPCODE_GAT: u8 = 0x1D;
-pub const OPCODE_GATQ: u8 = 0x1E;
-pub const OPCODE_SASL_LIST_MECHS: u8 = 0x20;
-pub const OPCODE_SASL_AUTH: u8 = 0x21;
-pub const OPCODE_SASL_STEP: u8 = 0x22;
-pub const OPCODE_RGET: u8 = 0x30;
-pub const OPCODE_RSET: u8 = 0x31;
-pub const OPCODE_RSETQ: u8 = 0x32;
-pub const OPCODE_RAPPEND: u8 = 0x33;
-pub const OPCODE_RAPPENDQ: u8 = 0x34;
-pub const OPCODE_RPREPEND: u8 = 0x35;
-pub const OPCODE_RPREPENDQ: u8 = 0x36;
-pub const OPCODE_RDEL: u8 = 0x37;
-pub const OPCODE_RDELQ: u8 = 0x38;
-pub const OPCODE_RINCR: u8 = 0x39;
-pub const OPCODE_RINCRQ: u8 = 0x3A;
-pub const OPCODE_RDECR: u8 = 0x3B;
-pub const OPCODE_RDECRQ: u8 = 0x3C;
-pub const OPCODE_SET_VBUCKET: u8 = 0x3D;
-pub const OPCODE_GET_VBUCKET: u8 = 0x3E;
-pub const OPCODE_DEL_VBUCKET: u8 = 0x3F;
-pub const OPCODE_TAP_CONNECT: u8 = 0x40;
-pub const OPCODE_TAP_MUTATION: u8 = 0x41;
-pub const OPCODE_TAP_DEL: u8 = 0x42;
-pub const OPCODE_TAP_FLUSH: u8 = 0x43;
-pub const OPCODE_TAP_OPAQUE: u8 = 0x44;
-pub const OPCODE_TAP_VBUCKET_SET: u8 = 0x45;
-pub const OPCODE_TAP_CHECKPOINT_START: u8 = 0x46;
-pub const OPCODE_TAP_CHECKPOINT_END: u8 = 0x47;
+const DATA_TYPE_RAW_BYTES: u8 = 0x00;
 
-pub const DATA_TYPE_RAW_BYTES: u8 = 0x00;
+/// Memcached response status
+#[deriving(Clone, Show, Eq, PartialEq)]
+pub enum Status {
+    NoError,
+    KeyNotFound,
+    KeyExists,
+    ValueTooLarge,
+    InvalidArguments,
+    ItemNotStored,
+    IncrDecrOnNonNumericValue,
+    VBucketBelongsToOtherServer,
+    AuthenticationError,
+    AuthenticationContinue,
+    UnknownCommand,
+    OutOfMemory,
+    NotSupported,
+    InternalError,
+    Busy,
+    TemporaryFailure,
+}
+
+impl Status {
+    /// Get the binary code of the status
+    pub fn code(&self) -> u16 {
+        match *self {
+            NoError => STATUS_NO_ERROR,
+            KeyNotFound => STATUS_KEY_NOT_FOUND,
+            KeyExists => STATUS_KEY_EXISTS,
+            ValueTooLarge => STATUS_VALUE_TOO_LARGE,
+            InvalidArguments => STATUS_INVALID_ARGUMENTS,
+            ItemNotStored => STATUS_ITEM_NOT_STORED,
+            IncrDecrOnNonNumericValue => STATUS_INCR_OR_DECR_ON_NON_NUMERIC_VALUE,
+            VBucketBelongsToOtherServer => STATUS_VBUCKET_BELONGS_TO_OTHER_SERVER,
+            AuthenticationError => STATUS_AUTHENTICATION_ERROR,
+            AuthenticationContinue => STATUS_AUTHENTICATION_CONTINUE,
+            UnknownCommand => STATUS_UNKNOWN_COMMAND,
+            OutOfMemory => STATUS_OUT_OF_MEMORY,
+            NotSupported => STATUS_NOT_SUPPORTED,
+            InternalError => STATUS_INTERNAL_ERROR,
+            Busy => STATUS_BUSY,
+            TemporaryFailure => STATUS_TEMPORARY_FAILURE,
+        }
+    }
+
+    /// Generate a Status from binary code
+    pub fn from_code(code: u16) -> Option<Status> {
+        match code {
+            STATUS_NO_ERROR => Some(NoError),
+            STATUS_KEY_NOT_FOUND => Some(KeyNotFound),
+            STATUS_KEY_EXISTS => Some(KeyExists),
+            STATUS_VALUE_TOO_LARGE => Some(ValueTooLarge),
+            STATUS_INVALID_ARGUMENTS => Some(InvalidArguments),
+            STATUS_ITEM_NOT_STORED => Some(ItemNotStored),
+            STATUS_INCR_OR_DECR_ON_NON_NUMERIC_VALUE => Some(IncrDecrOnNonNumericValue),
+            STATUS_VBUCKET_BELONGS_TO_OTHER_SERVER => Some(VBucketBelongsToOtherServer),
+            STATUS_AUTHENTICATION_ERROR => Some(AuthenticationError),
+            STATUS_AUTHENTICATION_CONTINUE => Some(AuthenticationContinue),
+            STATUS_UNKNOWN_COMMAND => Some(UnknownCommand),
+            STATUS_OUT_OF_MEMORY => Some(OutOfMemory),
+            STATUS_NOT_SUPPORTED => Some(NotSupported),
+            STATUS_INTERNAL_ERROR => Some(InternalError),
+            STATUS_BUSY => Some(Busy),
+            STATUS_TEMPORARY_FAILURE => Some(TemporaryFailure),
+            _ => None
+        }
+    }
+
+    /// Get a short description
+    pub fn desc(&self) -> &'static str {
+        match *self {
+            NoError => "no error",
+            KeyNotFound => "key not found",
+            KeyExists => "key exists",
+            ValueTooLarge => "value too large",
+            InvalidArguments => "invalid argument",
+            ItemNotStored => "item not stored",
+            IncrDecrOnNonNumericValue => "incr or decr on non-numeric value",
+            VBucketBelongsToOtherServer => "vbucket belongs to other server",
+            AuthenticationError => "authentication error",
+            AuthenticationContinue => "authentication continue",
+            UnknownCommand => "unknown command",
+            OutOfMemory => "out of memory",
+            NotSupported => "not supported",
+            InternalError => "internal error",
+            Busy => "busy",
+            TemporaryFailure => "temporary failure",
+        }
+    }
+}
 
 #[deriving(Clone, Show, Eq, PartialEq)]
 pub enum Command {
@@ -638,7 +726,7 @@ mod test {
 
             let resp_packet = binarydef::ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == proto::NoError);
+            assert!(resp_packet.header.status == proto::binary::NoError);
         }
 
         {
@@ -654,7 +742,7 @@ mod test {
 
             let resp_packet = binarydef::ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == proto::NoError);
+            assert!(resp_packet.header.status == proto::binary::NoError);
             assert_eq!(resp_packet.value.as_slice(), b"world");
         }
 
@@ -671,7 +759,7 @@ mod test {
 
             let resp_packet = binarydef::ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == proto::NoError);
+            assert!(resp_packet.header.status == proto::binary::NoError);
         }
     }
 }

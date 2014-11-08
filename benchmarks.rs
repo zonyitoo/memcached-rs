@@ -30,8 +30,8 @@ use std::rand::random;
 
 use memcached::client::Client;
 use memcached::proto::{Binary, Operation};
-use memcached::proto::MemCachedError;
-use memcached::proto::{KeyNotFound};
+use memcached::proto::BinaryProtoError;
+use memcached::proto::binary::{KeyNotFound};
 
 const SERVERS: &'static [(&'static str, uint)] = [
     ("127.0.0.1:11211", 1),
@@ -96,7 +96,7 @@ fn main() {
                         match client.get(key.to_string().as_slice().as_bytes()) {
                             Err(e) => {
                                 match e.kind {
-                                    MemCachedError(err) => {
+                                    BinaryProtoError(err) => {
                                         if err == KeyNotFound {
                                             miss += 1;
                                         } else {

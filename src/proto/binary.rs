@@ -30,16 +30,35 @@ use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOpe
 use proto::{Error, OtherError, binarydef, mod};
 use version::Version;
 
+pub use proto::binarydef::{
+    NoError,
+    KeyNotFound,
+    KeyExists,
+    ValueTooLarge,
+    InvalidArguments,
+    ItemNotStored,
+    IncrDecrOnNonNumericValue,
+    VBucketBelongsToOtherServer,
+    AuthenticationError,
+    AuthenticationContinue,
+    UnknownCommand,
+    OutOfMemory,
+    NotSupported,
+    InternalError,
+    Busy,
+    TemporaryFailure,
+};
+
 macro_rules! try_response(
     ($packet:expr) => ({
         let pk = $packet;
         match pk.header.status {
-            proto::NoError => {
+            NoError => {
                 pk
             }
             _ => {
-                use proto::MemCachedError;
-                return Err(Error::new(MemCachedError(pk.header.status),
+                use proto::BinaryProtoError;
+                return Err(Error::new(BinaryProtoError(pk.header.status),
                                       pk.header.status.desc(),
                                       match String::from_utf8(pk.value) {
                                           Ok(s) => Some(s),
@@ -55,8 +74,8 @@ macro_rules! try_response(
                 $ignored => { pk }
             )+
             _ => {
-                use proto::MemCachedError;
-                return Err(Error::new(MemCachedError(pk.header.status),
+                use proto::BinaryProtoError;
+                return Err(Error::new(BinaryProtoError(pk.header.status),
                                       pk.header.status.desc(),
                                       match String::from_utf8(pk.value) {
                                           Ok(s) => Some(s),
@@ -542,7 +561,7 @@ impl MultiOperation for BinaryProto {
 
         loop {
             let resp_packet = try_io!(binarydef::ResponsePacket::read_from(&mut self.stream));
-            let resp = try_response!(resp_packet, ignore: proto::NoError | proto::KeyNotFound);
+            let resp = try_response!(resp_packet, ignore: NoError | KeyNotFound);
 
             if resp.header.command == binarydef::Noop {
                 return Ok(());
