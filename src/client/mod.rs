@@ -22,6 +22,7 @@
 //! Memcached client
 
 use std::io::net::tcp::TcpStream;
+use std::io::net::pipe::UnixStream;
 use std::io::IoResult;
 use std::collections::{HashMap, TreeMap};
 use std::collections::hash_map::{Occupied, Vacant};
@@ -40,8 +41,13 @@ impl Server {
         Ok(Server {
             proto: match protocol {
                 proto::Binary => {
-                    let stream = try!(TcpStream::connect(addr));
-                    box proto::BinaryProto::new(stream) as Box<Proto + Send>
+                    if addr.contains("/") {
+                        let stream = try!(UnixStream::connect(&Path::new(addr)));
+                        box proto::BinaryProto::new(stream) as Box<Proto + Send>
+                    } else {
+                        let stream = try!(TcpStream::connect(addr));
+                        box proto::BinaryProto::new(stream) as Box<Proto + Send>
+                    }
                 }
             }
         })

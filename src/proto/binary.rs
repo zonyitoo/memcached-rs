@@ -20,7 +20,6 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 use std::io::{BufferedStream, MemWriter, BufReader};
-use std::io::net::tcp::TcpStream;
 use std::string::String;
 use std::str;
 use std::collections::TreeMap;
@@ -99,18 +98,18 @@ macro_rules! try_io(
     });
 )
 
-pub struct BinaryProto {
-    stream: BufferedStream<TcpStream>,
+pub struct BinaryProto<T: Reader + Writer + Clone + Send> {
+    stream: BufferedStream<T>,
 }
 
-impl proto::Proto for BinaryProto {
+impl<T: Reader + Writer + Clone + Send> proto::Proto for BinaryProto<T> {
     fn clone(&self) -> Box<proto::Proto + Send> {
         box BinaryProto { stream: BufferedStream::new(self.stream.get_ref().clone()) }
     }
 }
 
-impl BinaryProto {
-    pub fn new(stream: TcpStream) -> BinaryProto {
+impl<T: Reader + Writer + Clone + Send> BinaryProto<T> {
+    pub fn new(stream: T) -> BinaryProto<T> {
         BinaryProto {
             stream: BufferedStream::new(stream),
         }
@@ -132,7 +131,7 @@ impl BinaryProto {
     }
 }
 
-impl Operation for BinaryProto {
+impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
@@ -394,7 +393,7 @@ impl Operation for BinaryProto {
     }
 }
 
-impl ServerOperation for BinaryProto {
+impl<T: Reader + Writer + Clone + Send> ServerOperation for BinaryProto<T> {
     fn quit(&mut self) -> Result<(), Error> {
         let opaque = random::<u32>();
         let req_header = binarydef::RequestHeader::new(binarydef::Quit, binarydef::RawBytes, 0, opaque, 0);
@@ -520,7 +519,7 @@ impl ServerOperation for BinaryProto {
     }
 }
 
-impl MultiOperation for BinaryProto {
+impl<T: Reader + Writer + Clone + Send> MultiOperation for BinaryProto<T> {
     fn set_multi(&mut self, kv: TreeMap<Vec<u8>, (Vec<u8>, u32, u32)>) -> Result<(), Error> {
         for (key, (value, flags, expiration)) in kv.into_iter() {
             let mut extra_buf = MemWriter::with_capacity(8);
@@ -600,7 +599,7 @@ impl MultiOperation for BinaryProto {
     }
 }
 
-impl NoReplyOperation for BinaryProto {
+impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
     fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
@@ -744,7 +743,7 @@ impl NoReplyOperation for BinaryProto {
     }
 }
 
-impl CasOperation for BinaryProto {
+impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
     fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error> {
         let opaque = random::<u32>();
         let mut extra_buf = MemWriter::with_capacity(8);
