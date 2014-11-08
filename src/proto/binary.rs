@@ -83,6 +83,12 @@ pub struct BinaryProto {
     stream: BufferedStream<TcpStream>,
 }
 
+impl proto::Proto for BinaryProto {
+    fn clone(&self) -> Box<proto::Proto + Send> {
+        box BinaryProto { stream: BufferedStream::new(self.stream.get_ref().clone()) }
+    }
+}
+
 impl BinaryProto {
     pub fn new(stream: TcpStream) -> BinaryProto {
         BinaryProto {
