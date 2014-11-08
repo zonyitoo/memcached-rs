@@ -995,7 +995,7 @@ mod test {
 
     const SERVER_ADDR: &'static str = "127.0.0.1:11211";
 
-    fn get_client() -> BinaryProto {
+    fn get_client() -> BinaryProto<TcpStream> {
         let stream = TcpStream::connect(SERVER_ADDR).unwrap();
         BinaryProto::new(stream)
     }
