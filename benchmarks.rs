@@ -28,15 +28,16 @@ extern crate time;
 
 use std::rand::random;
 
-use memcached::client::Client;
-use memcached::proto::{Binary, Operation};
-use memcached::proto::BinaryProtoError;
-use memcached::proto::binary::{KeyNotFound};
+use memcached::client::{Client, AddrType};
+use memcached::client::AddrType::TcpAddr;
+use memcached::proto::{ProtoType, Operation};
+use memcached::proto::ErrorKind;
+use memcached::proto::binary::Status;
 
-const SERVERS: &'static [(&'static str, uint)] = [
-    ("127.0.0.1:11211", 1),
-    // ("127.0.0.1:11212", 1),
-    // ("127.0.0.1:11213", 1),
+const SERVERS: &'static [(AddrType<'static>, uint)] = [
+    (TcpAddr("127.0.0.1:11211"), 1),
+    // (TcpAddr("127.0.0.1:11212"), 1),
+    // (TcpAddr("127.0.0.1:11213"), 1),
 ];
 
 const TESTS: &'static [(uint, uint, f64, uint)] = [
@@ -80,7 +81,7 @@ fn main() {
         for offset in range(0, concurrent) {
             let (tx, rx) = channel();
             spawn(proc() {
-                let mut client = Client::connect(SERVERS, Binary).unwrap_or_else(|err| {
+                let mut client = Client::connect(SERVERS, ProtoType::Binary).unwrap_or_else(|err| {
                     panic!("{} failed to connect server {}", offset, err);
                 });
 
@@ -96,8 +97,8 @@ fn main() {
                         match client.get(key.to_string().as_slice().as_bytes()) {
                             Err(e) => {
                                 match e.kind {
-                                    BinaryProtoError(err) => {
-                                        if err == KeyNotFound {
+                                    ErrorKind::BinaryProtoError(err) => {
+                                        if err == Status::KeyNotFound {
                                             miss += 1;
                                         } else {
                                             error += 1;

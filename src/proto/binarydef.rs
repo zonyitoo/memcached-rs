@@ -703,7 +703,8 @@ mod test {
     use std::io::net::tcp::TcpStream;
     use std::io::BufferedStream;
 
-    use proto::{binarydef, mod};
+    use proto;
+    use proto::binarydef::{RequestHeader, RequestPacket, ResponsePacket, Command, DataType};
 
     fn test_stream() -> TcpStream {
         TcpStream::connect("127.0.0.1:11211").unwrap()
@@ -714,8 +715,8 @@ mod test {
         let mut stream = BufferedStream::new(test_stream());
 
         {
-            let req_header = binarydef::RequestHeader::new(binarydef::Set, binarydef::RawBytes, 0, 0, 0);
-            let mut req_packet = binarydef::RequestPacket::new(
+            let req_header = RequestHeader::new(Command::Set, DataType::RawBytes, 0, 0, 0);
+            let mut req_packet = RequestPacket::new(
                                 req_header,
                                 vec![0xde, 0xad, 0xbe, 0xef, 0x00, 0x00, 0x0e, 0x10],
                                 b"test:binary_proto:hello".to_vec(),
@@ -724,14 +725,14 @@ mod test {
             req_packet.write_to(&mut stream).unwrap();
             stream.flush().unwrap();
 
-            let resp_packet = binarydef::ResponsePacket::read_from(&mut stream).unwrap();
+            let resp_packet = ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == proto::binary::NoError);
+            assert!(resp_packet.header.status == proto::binary::Status::NoError);
         }
 
         {
-            let req_header = binarydef::RequestHeader::new(binarydef::Get, binarydef::RawBytes, 0, 0, 0);
-            let mut req_packet = binarydef::RequestPacket::new(
+            let req_header = RequestHeader::new(Command::Get, DataType::RawBytes, 0, 0, 0);
+            let mut req_packet = RequestPacket::new(
                                 req_header,
                                 vec![],
                                 b"test:binary_proto:hello".to_vec(),
@@ -740,15 +741,15 @@ mod test {
             req_packet.write_to(&mut stream).unwrap();
             stream.flush().unwrap();
 
-            let resp_packet = binarydef::ResponsePacket::read_from(&mut stream).unwrap();
+            let resp_packet = ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == proto::binary::NoError);
+            assert!(resp_packet.header.status == proto::binary::Status::NoError);
             assert_eq!(resp_packet.value.as_slice(), b"world");
         }
 
         {
-            let req_header = binarydef::RequestHeader::new(binarydef::Delete, binarydef::RawBytes, 0, 0, 0);
-            let mut req_packet = binarydef::RequestPacket::new(
+            let req_header = RequestHeader::new(Command::Delete, DataType::RawBytes, 0, 0, 0);
+            let mut req_packet = RequestPacket::new(
                                 req_header,
                                 vec![],
                                 b"test:binary_proto:hello".to_vec(),
@@ -757,9 +758,9 @@ mod test {
             req_packet.write_to(&mut stream).unwrap();
             stream.flush().unwrap();
 
-            let resp_packet = binarydef::ResponsePacket::read_from(&mut stream).unwrap();
+            let resp_packet = ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == proto::binary::NoError);
+            assert!(resp_packet.header.status == proto::binary::Status::NoError);
         }
     }
 }
