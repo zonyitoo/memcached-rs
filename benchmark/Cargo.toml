@@ -1,0 +1,14 @@
+[package]
+
+name = "memcached-benchmark"
+version = "0.0.1"
+authors = ["Y. T. CHUNG <zonyitoo@gmail.com>"]
+
+[[bin]]
+
+name = "benchmark"
+path = "benchmarks.rs"
+
+[dependencies.time]
+
+git = "https://github.com/rust-lang/time.git"
