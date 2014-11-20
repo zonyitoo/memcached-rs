@@ -45,13 +45,13 @@ impl Server {
     fn connect(addr: AddrType, protocol: proto::ProtoType) -> IoResult<Server> {
         Ok(Server {
             proto: match protocol {
-                proto::Binary => {
+                proto::ProtoType::Binary => {
                     match addr {
-                        UnixPipeAddr(addr) => {
+                        AddrType::UnixPipeAddr(addr) => {
                             let stream = try!(UnixStream::connect(&Path::new(addr)));
                             box proto::BinaryProto::new(stream) as Box<Proto + Send>
                         },
-                        TcpAddr(addr) => {
+                        AddrType::TcpAddr(addr) => {
                             let stream = try!(TcpStream::connect(addr));
                             box proto::BinaryProto::new(stream) as Box<Proto + Send>
                         }
@@ -442,8 +442,8 @@ impl CasOperation for Client {
 #[cfg(test)]
 mod test {
     use test::Bencher;
-    use client::{Client, TcpAddr};
-    use proto::{Operation, NoReplyOperation, Binary};
+    use client::{Client, AddrType};
+    use proto::{Operation, NoReplyOperation, ProtoType};
     use std::rand::random;
 
     fn generate_data(len: uint) -> Vec<u8> {
@@ -455,7 +455,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(64);
 
-        let mut client = Client::connect([(TcpAddr("127.0.0.1:11211"), 1)], Binary).unwrap();
+        let mut client = Client::connect(&[(AddrType::TcpAddr("127.0.0.1:11211"), 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, val.as_slice(), 0, 2));
     }
@@ -465,7 +465,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(64);
 
-        let mut client = Client::connect([(TcpAddr("127.0.0.1:11211"), 1)], Binary).unwrap();
+        let mut client = Client::connect(&[(AddrType::TcpAddr("127.0.0.1:11211"), 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
     }
@@ -475,7 +475,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(512);
 
-        let mut client = Client::connect([(TcpAddr("127.0.0.1:11211"), 1)], Binary).unwrap();
+        let mut client = Client::connect(&[(AddrType::TcpAddr("127.0.0.1:11211"), 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, val.as_slice(), 0, 2));
     }
@@ -485,7 +485,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(512);
 
-        let mut client = Client::connect([(TcpAddr("127.0.0.1:11211"), 1)], Binary).unwrap();
+        let mut client = Client::connect(&[(AddrType::TcpAddr("127.0.0.1:11211"), 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
     }
@@ -495,7 +495,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(1024);
 
-        let mut client = Client::connect([(TcpAddr("127.0.0.1:11211"), 1)], Binary).unwrap();
+        let mut client = Client::connect(&[(AddrType::TcpAddr("127.0.0.1:11211"), 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, val.as_slice(), 0, 2));
     }
@@ -505,7 +505,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(1024);
 
-        let mut client = Client::connect([(TcpAddr("127.0.0.1:11211"), 1)], Binary).unwrap();
+        let mut client = Client::connect(&[(AddrType::TcpAddr("127.0.0.1:11211"), 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
     }
@@ -515,7 +515,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(4096);
 
-        let mut client = Client::connect([(TcpAddr("127.0.0.1:11211"), 1)], Binary).unwrap();
+        let mut client = Client::connect(&[(AddrType::TcpAddr("127.0.0.1:11211"), 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, val.as_slice(), 0, 2));
     }
@@ -525,7 +525,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(4096);
 
-        let mut client = Client::connect([(TcpAddr("127.0.0.1:11211"), 1)], Binary).unwrap();
+        let mut client = Client::connect(&[(AddrType::TcpAddr("127.0.0.1:11211"), 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
     }
@@ -535,7 +535,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(16384);
 
-        let mut client = Client::connect([(TcpAddr("127.0.0.1:11211"), 1)], Binary).unwrap();
+        let mut client = Client::connect(&[(AddrType::TcpAddr("127.0.0.1:11211"), 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, val.as_slice(), 0, 2));
     }
@@ -545,7 +545,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(16384);
 
-        let mut client = Client::connect([(TcpAddr("127.0.0.1:11211"), 1)], Binary).unwrap();
+        let mut client = Client::connect(&[(AddrType::TcpAddr("127.0.0.1:11211"), 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
     }

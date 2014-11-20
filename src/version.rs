@@ -22,7 +22,7 @@
 //! Memcached version
 
 use std::fmt::{Show, Formatter, mod};
-use std::from_str::FromStr;
+use std::str::FromStr;
 
 /// Memcached version
 ///
