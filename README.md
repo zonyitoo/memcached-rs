@@ -11,11 +11,14 @@ extern crate memcached;
 
 use std::collections::TreeMap;
 
-use memcached::client::{Client, TcpAddr};
-use memcached::proto::{Operation, MultiOperation, NoReplyOperation, CasOperation, Binary};
+use memcached::client::{Client, AddrType};
+use memcached::proto::{Operation, MultiOperation, NoReplyOperation, CasOperation, ProtoType};
 
 fn main() {
-    let mut client = Client::connect([(TcpAddr("127.0.0.1:11211"), 1)], Binary).unwrap();
+    let servers = [
+        (AddrType::TcpAddr("127.0.0.1:11211"), 1),
+    ];
+    let mut client = Client::connect(&servers, ProtoType::Binary).unwrap();
 
     client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
     let (value, flags) = client.get(b"Foo").unwrap();
