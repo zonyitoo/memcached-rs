@@ -1,3 +1,4 @@
+#[deriving(Copy)]
 pub struct Crc32 {
     table: [u32, ..256],
     value: u32

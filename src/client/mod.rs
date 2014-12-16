@@ -32,6 +32,7 @@ use crc32::Crc32;
 use proto::{Proto, Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation};
 use proto::{MemCachedResult, mod};
 
+#[deriving(Clone)]
 pub enum AddrType<'a> {
     UnixPipeAddr(&'a str),
     TcpAddr(&'a str),
@@ -115,10 +116,10 @@ impl Client {
         }
         let mut servers = Vec::new();
         let mut bucket = Vec::new();
-        for &(addr, weight) in svrs.iter() {
-            servers.push(box try!(Server::connect(addr, p)));
+        for &(ref addr, ref weight) in svrs.iter() {
+            servers.push(box try!(Server::connect(addr.clone(), p)));
 
-            for _ in range(0, weight) {
+            for _ in range(0, *weight) {
                 bucket.push(servers.len() - 1);
             }
         }
@@ -230,7 +231,7 @@ impl MultiOperation for Client {
         for (svr_idx, v) in sk.into_iter() {
             let (tx2, rx2) = channel();
             let mut svr = self.servers[svr_idx].clone();
-            spawn(proc() {
+            spawn(move || {
                 let r = svr.proto.set_multi(v);
                 tx2.send(r);
                 drop(tx2);
@@ -268,7 +269,7 @@ impl MultiOperation for Client {
         for (svr_idx, v) in sk.into_iter() {
             let (tx2, rx2) = channel();
             let mut svr = self.servers[svr_idx].clone();
-            spawn(proc() {
+            spawn(move || {
                 let r = svr.proto.delete_multi(v);
                 tx2.send(r);
                 drop(tx2);
@@ -306,7 +307,7 @@ impl MultiOperation for Client {
         for (svr_idx, v) in sk.into_iter() {
             let (tx2, rx2) = channel();
             let mut svr = self.servers[svr_idx].clone();
-            spawn(proc() {
+            spawn(move || {
                 let r = svr.proto.get_multi(v);
                 tx2.send(r);
                 drop(tx2);

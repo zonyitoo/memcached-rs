@@ -27,6 +27,7 @@ use std::str::FromStr;
 /// Memcached version
 ///
 /// Version(major, minor, patch)
+#[deriving(Copy)]
 pub struct Version(uint, uint, uint);
 
 impl Version {

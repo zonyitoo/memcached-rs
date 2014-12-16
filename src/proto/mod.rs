@@ -33,11 +33,12 @@ mod binarydef;
 pub mod binary;
 
 /// Protocol type
+#[deriving(Copy)]
 pub enum ProtoType {
     Binary,
 }
 
-#[deriving(Clone)]
+#[deriving(Clone, Copy)]
 pub enum ErrorKind {
     BinaryProtoError(binarydef::Status),
     IoError(io::IoErrorKind),

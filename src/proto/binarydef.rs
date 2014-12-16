@@ -133,7 +133,7 @@ const OPCODE_TAP_CHECKPOINT_END: u8 = 0x47;
 const DATA_TYPE_RAW_BYTES: u8 = 0x00;
 
 /// Memcached response status
-#[deriving(Clone, Show, Eq, PartialEq)]
+#[deriving(Copy, Clone, Show, Eq, PartialEq)]
 pub enum Status {
     NoError,
     KeyNotFound,
@@ -634,12 +634,14 @@ impl RequestPacket {
     pub fn read_from(reader: &mut Reader) -> IoResult<RequestPacket> {
         let header = try!(RequestHeader::read_from(reader));
 
-        let value_len = header.body_len as uint - header.extra_len as uint - header.key_len as uint;
+        let extra_len = header.extra_len as uint;
+        let key_len = header.key_len as uint;
+        let value_len = header.body_len as uint - extra_len - key_len;
 
         Ok(RequestPacket {
             header: header,
-            extra: try!(reader.read_exact(header.extra_len as uint)),
-            key: try!(reader.read_exact(header.key_len as uint)),
+            extra: try!(reader.read_exact(extra_len as uint)),
+            key: try!(reader.read_exact(key_len as uint)),
             value: try!(reader.read_exact(value_len)),
         })
     }
@@ -679,12 +681,14 @@ impl ResponsePacket {
     pub fn read_from(reader: &mut Reader) -> IoResult<ResponsePacket> {
         let header = try!(ResponseHeader::read_from(reader));
 
-        let value_len = header.body_len as uint - header.extra_len as uint - header.key_len as uint;
+        let extra_len = header.extra_len as uint;
+        let key_len = header.key_len as uint;
+        let value_len = header.body_len as uint - extra_len - key_len;
 
         Ok(ResponsePacket {
             header: header,
-            extra: try!(reader.read_exact(header.extra_len as uint)),
-            key: try!(reader.read_exact(header.key_len as uint)),
+            extra: try!(reader.read_exact(extra_len)),
+            key: try!(reader.read_exact(key_len)),
             value: try!(reader.read_exact(value_len)),
         })
     }

@@ -20,10 +20,8 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #![experimental]
-#![license = "MIT"]
 #![crate_type = "lib"]
 #![crate_name = "memcached"]
-#![desc = "Memcached library in Rust"]
 
 #![feature(phase)]
 #![feature(macro_rules)]

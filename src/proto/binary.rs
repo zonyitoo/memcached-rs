@@ -41,8 +41,9 @@ macro_rules! try_response(
             }
             _ => {
                 use proto::ErrorKind;
-                return Err(Error::new(ErrorKind::BinaryProtoError(pk.header.status),
-                                      pk.header.status.desc(),
+                let status = pk.header.status;
+                return Err(Error::new(ErrorKind::BinaryProtoError(status.clone()),
+                                      status.desc(),
                                       match String::from_utf8(pk.value) {
                                           Ok(s) => Some(s),
                                           Err(..) => None,
@@ -58,8 +59,9 @@ macro_rules! try_response(
             )+
             _ => {
                 use proto::ErrorKind;
-                return Err(Error::new(ErrorKind::BinaryProtoError(pk.header.status),
-                                      pk.header.status.desc(),
+                let status = pk.header.status;
+                return Err(Error::new(ErrorKind::BinaryProtoError(status.clone()),
+                                      status.desc(),
                                       match String::from_utf8(pk.value) {
                                           Ok(s) => Some(s),
                                           Err(..) => None,
@@ -125,7 +127,7 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Set, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 value.to_vec());
 
@@ -149,7 +151,7 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Add, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 value.to_vec());
 
@@ -193,7 +195,7 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Replace, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 value.to_vec());
 
@@ -266,7 +268,7 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Increment, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 Vec::new());
 
@@ -293,7 +295,7 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Decrement, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 Vec::new());
 
@@ -360,7 +362,7 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Touch, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 Vec::new());
 
@@ -407,7 +409,7 @@ impl<T: Reader + Writer + Clone + Send> ServerOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Flush, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 Vec::new(),
                                 Vec::new());
 
@@ -513,7 +515,7 @@ impl<T: Reader + Writer + Clone + Send> MultiOperation for BinaryProto<T> {
             let req_header = RequestHeader::new(Command::SetQuietly, DataType::RawBytes, 0, 0, 0);
             let mut req_packet = RequestPacket::new(
                                     req_header,
-                                    extra_buf.unwrap(),
+                                    extra_buf.into_inner(),
                                     key,
                                     value);
 
@@ -593,7 +595,7 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::SetQuietly, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 value.to_vec());
 
@@ -612,7 +614,7 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::AddQuietly, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 value.to_vec());
 
@@ -646,7 +648,7 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::ReplaceQuietly, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 value.to_vec());
 
@@ -666,7 +668,7 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::IncrementQuietly, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 Vec::new());
 
@@ -686,7 +688,7 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::DecrementQuietly, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 Vec::new());
 
@@ -737,7 +739,7 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Set, DataType::RawBytes, 0, opaque, cas);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 value.to_vec());
 
@@ -761,7 +763,7 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Add, DataType::RawBytes, 0, opaque, 0);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 value.to_vec());
 
@@ -785,7 +787,7 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Replace, DataType::RawBytes, 0, opaque, cas);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 value.to_vec());
 
@@ -859,7 +861,7 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Increment, DataType::RawBytes, 0, opaque, cas);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 Vec::new());
 
@@ -887,7 +889,7 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Decrement, DataType::RawBytes, 0, opaque, cas);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 Vec::new());
 
@@ -954,7 +956,7 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
         let req_header = RequestHeader::new(Command::Touch, DataType::RawBytes, 0, opaque, cas);
         let mut req_packet = RequestPacket::new(
                                 req_header,
-                                extra_buf.unwrap(),
+                                extra_buf.into_inner(),
                                 key.to_vec(),
                                 Vec::new());
 
