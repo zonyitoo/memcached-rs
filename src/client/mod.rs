@@ -74,8 +74,10 @@ impl Clone for Server {
 
 /// Memcached client
 ///
-/// ```no_run
-/// use std::collections::TreeMap;
+/// ```ignore
+/// extern crate collect;
+///
+/// use collect::TreeMap;
 /// use memcached::client::{Client, AddrType};
 /// use memcached::proto::{Operation, MultiOperation, NoReplyOperation, CasOperation, ProtoType};
 ///
