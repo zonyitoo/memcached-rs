@@ -50,13 +50,13 @@ macro_rules! try_option(
             None => { return None; },
         }
     );
-)
+);
 
 impl FromStr for Version {
     fn from_str(s: &str) -> Option<Version> {
         let sp: Vec<&str> = s.split('.').collect();
-        Some(Version::new(try_option!(from_str::<uint>(sp[0])),
-                          try_option!(from_str::<uint>(sp[1])),
-                          try_option!(from_str::<uint>(sp[2]))))
+        Some(Version::new(try_option!(sp[0].parse::<uint>()),
+                          try_option!(sp[1].parse::<uint>()),
+                          try_option!(sp[2].parse::<uint>())))
     }
 }

@@ -22,8 +22,9 @@
 use std::io::{BufferedStream, MemWriter, BufReader};
 use std::string::String;
 use std::str;
-use std::collections::TreeMap;
 use std::rand::random;
+
+use collect::TreeMap;
 
 use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation};
 use proto::{Error, ErrorKind, Proto};
@@ -69,7 +70,7 @@ macro_rules! try_response(
             }
         }
     });
-)
+);
 
 macro_rules! try_io(
     ($do_io:expr) => ( {
@@ -82,7 +83,7 @@ macro_rules! try_io(
             }
         }
     });
-)
+);
 
 pub struct BinaryProto<T: Reader + Writer + Clone + Send> {
     stream: BufferedStream<T>,
@@ -454,11 +455,11 @@ impl<T: Reader + Writer + Clone + Send> ServerOperation for BinaryProto<T> {
 
         let val = try_response!(resp_packet).value;
         let verstr = match str::from_utf8(val.as_slice()) {
-            Some(vs) => vs,
-            None => return Err(Error::new(ErrorKind::OtherError, "Response is not a string", None)),
+            Ok(vs) => vs,
+            Err(..) => return Err(Error::new(ErrorKind::OtherError, "Response is not a string", None)),
         };
 
-        Ok(match from_str(verstr) {
+        Ok(match verstr.parse() {
             Some(v) => v,
             None => return Err(Error::new(ErrorKind::OtherError, "Unrecognized version string", None)),
         })
@@ -1174,7 +1175,7 @@ mod test {
         assert_eq!(get_resp_map.get(&b"test:multi_hello2".to_vec()),
                    Some(&(b"world2".to_vec(), 0xdeadbeef)));
         assert_eq!(get_resp_map.get(&b"test:multi_lastone".to_vec()),
-                   Some(&(b"last!".to_vec(), 0xdeadbeef)))
+                   Some(&(b"last!".to_vec(), 0xdeadbeef)));
 
         let del_resp = client.delete_multi(vec![b"test:multi_hello1".to_vec(),
                                                 b"test:multi_hello2".to_vec()]);
@@ -1191,7 +1192,7 @@ mod test {
         assert_eq!(get_resp_map.get(&b"test:multi_hello2".to_vec()),
                    None);
         assert_eq!(get_resp_map.get(&b"test:multi_lastone".to_vec()),
-                   Some(&(b"last!".to_vec(), 0xdeadbeef)))
+                   Some(&(b"last!".to_vec(), 0xdeadbeef)));
 
         let del_resp = client.delete_multi(vec![b"lastone".to_vec(),
                                                 b"not_exists!!!!".to_vec()]);

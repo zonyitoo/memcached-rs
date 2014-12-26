@@ -22,7 +22,7 @@
 //! Memcached protocol
 
 use std::fmt::{Show, Formatter, mod};
-use std::collections::TreeMap;
+use collect::TreeMap;
 use std::io;
 
 use version;

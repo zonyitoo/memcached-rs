@@ -1,13 +1,13 @@
 [package]
-
 name = "memcached-rs"
 version = "0.0.1"
 authors = ["Y. T. CHUNG <zonyitoo@gmail.com>"]
 
 [lib]
-
 name = "memcached"
 
 [dependencies.crc32]
-
 path = "src/crc32"
+
+[dependencies.collect]
+git = "https://github.com/Gankro/collect-rs.git"

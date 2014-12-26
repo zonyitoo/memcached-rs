@@ -24,8 +24,11 @@
 use std::io::net::tcp::TcpStream;
 use std::io::net::pipe::UnixStream;
 use std::io::{IoResult, IoError, OtherIoError};
-use std::collections::{HashMap, TreeMap};
-use std::collections::hash_map::{Occupied, Vacant};
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+use std::thread::Thread;
+
+use collect::TreeMap;
 
 use crc32::Crc32;
 
@@ -214,10 +217,10 @@ impl MultiOperation for Client {
                 let svr_idx = self.find_server_index_by_key(key.as_slice());
 
                 match svrkey.entry(svr_idx) {
-                    Occupied(entry) => {
+                    Entry::Occupied(entry) => {
                         entry.into_mut().insert(key, v);
                     },
-                    Vacant(entry) => {
+                    Entry::Vacant(entry) => {
                         let mut t = TreeMap::new();
                         t.insert(key, v);
                         entry.set(t);
@@ -231,11 +234,11 @@ impl MultiOperation for Client {
         for (svr_idx, v) in sk.into_iter() {
             let (tx2, rx2) = channel();
             let mut svr = self.servers[svr_idx].clone();
-            spawn(move || {
+            Thread::spawn(move || {
                 let r = svr.proto.set_multi(v);
                 tx2.send(r);
                 drop(tx2);
-            });
+            }).detach();
             chans.push(rx2);
         }
 
@@ -254,10 +257,10 @@ impl MultiOperation for Client {
                 let svr_idx = self.find_server_index_by_key(key.as_slice());
 
                 match svrkey.entry(svr_idx) {
-                    Occupied(entry) => {
+                    Entry::Occupied(entry) => {
                         entry.into_mut().push(key);
                     },
-                    Vacant(entry) => {
+                    Entry::Vacant(entry) => {
                         entry.set(vec![key]);
                     }
                 }
@@ -269,11 +272,11 @@ impl MultiOperation for Client {
         for (svr_idx, v) in sk.into_iter() {
             let (tx2, rx2) = channel();
             let mut svr = self.servers[svr_idx].clone();
-            spawn(move || {
+            Thread::spawn(move || {
                 let r = svr.proto.delete_multi(v);
                 tx2.send(r);
                 drop(tx2);
-            });
+            }).detach();
             chans.push(rx2);
         }
 
@@ -292,10 +295,10 @@ impl MultiOperation for Client {
                 let svr_idx = self.find_server_index_by_key(key.as_slice());
 
                 match svrkey.entry(svr_idx) {
-                    Occupied(entry) => {
+                    Entry::Occupied(entry) => {
                         entry.into_mut().push(key);
                     },
-                    Vacant(entry) => {
+                    Entry::Vacant(entry) => {
                         entry.set(vec![key]);
                     }
                 }
@@ -307,11 +310,11 @@ impl MultiOperation for Client {
         for (svr_idx, v) in sk.into_iter() {
             let (tx2, rx2) = channel();
             let mut svr = self.servers[svr_idx].clone();
-            spawn(move || {
+            Thread::spawn(move || {
                 let r = svr.proto.get_multi(v);
                 tx2.send(r);
                 drop(tx2);
-            });
+            }).detach();
             chans.push(rx2);
         }
 
