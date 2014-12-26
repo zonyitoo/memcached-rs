@@ -977,7 +977,7 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
 #[cfg(test)]
 mod test {
     use std::io::net::tcp::TcpStream;
-    use std::collections::TreeMap;
+    use collect::TreeMap;
     use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation, BinaryProto};
 
     const SERVER_ADDR: &'static str = "127.0.0.1:11211";
