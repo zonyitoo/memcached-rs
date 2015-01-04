@@ -21,7 +21,7 @@
 
 //! Memcached protocol
 
-use std::fmt::{Show, Formatter, mod};
+use std::fmt::{Show, Formatter, self};
 use collect::TreeMap;
 use std::io;
 
@@ -33,12 +33,12 @@ mod binarydef;
 pub mod binary;
 
 /// Protocol type
-#[deriving(Copy)]
+#[derive(Copy)]
 pub enum ProtoType {
     Binary,
 }
 
-#[deriving(Clone, Copy)]
+#[derive(Clone, Copy)]
 pub enum ErrorKind {
     BinaryProtoError(binarydef::Status),
     IoError(io::IoErrorKind),
@@ -47,7 +47,7 @@ pub enum ErrorKind {
 
 pub type MemCachedResult<T> = Result<T, Error>;
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct Error {
     pub kind: ErrorKind,
     pub desc: &'static str,

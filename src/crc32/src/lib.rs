@@ -1,6 +1,6 @@
-#[deriving(Copy)]
+#[derive(Copy)]
 pub struct Crc32 {
-    table: [u32, ..256],
+    table: [u32; 256],
     value: u32
 }
 
@@ -9,7 +9,7 @@ static CRC32_INITIAL:u32 = 0xedb88320;
 impl Crc32 {
 
     pub fn new() -> Crc32 {
-        let mut c = Crc32 { table: [0, ..256], value: 0xffffffff };
+        let mut c = Crc32 { table: [0; 256], value: 0xffffffff };
 
         for i in range(0u, 256) {
             let mut v = i as u32;
@@ -49,7 +49,7 @@ impl Crc32 {
 
 #[test]
 fn test_crc32() {
-    let mut buf = [0, ..1024 * 1024];
+    let mut buf = [0; 1024 * 1024];
     let mut crc = Crc32::new();
 
     for arg in os::args().iter().skip(1) {

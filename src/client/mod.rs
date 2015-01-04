@@ -27,15 +27,16 @@ use std::io::{IoResult, IoError, OtherIoError};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::thread::Thread;
+use std::sync::mpsc::channel;
 
 use collect::TreeMap;
 
 use crc32::Crc32;
 
 use proto::{Proto, Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation};
-use proto::{MemCachedResult, mod};
+use proto::{MemCachedResult, self};
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub enum AddrType<'a> {
     UnixPipeAddr(&'a str),
     TcpAddr(&'a str),
@@ -238,7 +239,7 @@ impl MultiOperation for Client {
             let mut svr = self.servers[svr_idx].clone();
             Thread::spawn(move || {
                 let r = svr.proto.set_multi(v);
-                tx2.send(r);
+                tx2.send(r).unwrap();
                 drop(tx2);
             }).detach();
             chans.push(rx2);
@@ -246,7 +247,7 @@ impl MultiOperation for Client {
 
         let mut result = Ok(());
         for chan in chans.into_iter() {
-            result = result.or(chan.recv());
+            result = result.or(chan.recv().unwrap());
         }
 
         result
@@ -276,7 +277,7 @@ impl MultiOperation for Client {
             let mut svr = self.servers[svr_idx].clone();
             Thread::spawn(move || {
                 let r = svr.proto.delete_multi(v);
-                tx2.send(r);
+                tx2.send(r).unwrap();
                 drop(tx2);
             }).detach();
             chans.push(rx2);
@@ -284,7 +285,7 @@ impl MultiOperation for Client {
 
         let mut result = Ok(());
         for chan in chans.into_iter() {
-            result = result.or(chan.recv());
+            result = result.or(chan.recv().unwrap());
         }
 
         result
@@ -314,7 +315,7 @@ impl MultiOperation for Client {
             let mut svr = self.servers[svr_idx].clone();
             Thread::spawn(move || {
                 let r = svr.proto.get_multi(v);
-                tx2.send(r);
+                tx2.send(r).unwrap();
                 drop(tx2);
             }).detach();
             chans.push(rx2);
@@ -322,11 +323,11 @@ impl MultiOperation for Client {
 
         let mut chan_iter = chans.into_iter();
         let mut result = match chan_iter.next() {
-            Some(chan) => chan.recv(),
+            Some(chan) => chan.recv().unwrap(),
             None => return Ok(TreeMap::new()),
         };
         for rx in chan_iter {
-            let r = rx.recv();
+            let r = rx.recv().unwrap();
             match r {
                 Ok(m) => {
                     result = match result {

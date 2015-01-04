@@ -21,13 +21,13 @@
 
 //! Memcached version
 
-use std::fmt::{Show, Formatter, mod};
+use std::fmt::{Show, Formatter, self};
 use std::str::FromStr;
 
 /// Memcached version
 ///
 /// Version(major, minor, patch)
-#[deriving(Copy)]
+#[derive(Copy)]
 pub struct Version(uint, uint, uint);
 
 impl Version {

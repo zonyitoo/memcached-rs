@@ -133,7 +133,7 @@ const OPCODE_TAP_CHECKPOINT_END: u8 = 0x47;
 const DATA_TYPE_RAW_BYTES: u8 = 0x00;
 
 /// Memcached response status
-#[deriving(Copy, Clone, Show, Eq, PartialEq)]
+#[derive(Copy, Clone, Show, Eq, PartialEq)]
 pub enum Status {
     NoError,
     KeyNotFound,
@@ -222,7 +222,7 @@ impl Status {
     }
 }
 
-#[deriving(Clone, Show, Eq, PartialEq)]
+#[derive(Clone, Show, Eq, PartialEq)]
 pub enum Command {
     Get,
     Set,
@@ -413,7 +413,7 @@ impl Command {
     }
 }
 
-#[deriving(Clone, Show, Eq, PartialEq)]
+#[derive(Clone, Show, Eq, PartialEq)]
 pub enum DataType {
     RawBytes,
 }
@@ -449,7 +449,7 @@ impl DataType {
 //   |                                                               |
 //   +---------------+---------------+---------------+---------------+
 //   Total 24 bytes
-#[deriving(Clone, Show)]
+#[derive(Clone, Show)]
 pub struct RequestHeader {
     pub command: Command,
     key_len: u16,
@@ -531,7 +531,7 @@ impl RequestHeader {
 //   |                                                               |
 //   +---------------+---------------+---------------+---------------+
 //   Total 24 bytes
-#[deriving(Clone, Show)]
+#[derive(Clone, Show)]
 pub struct ResponseHeader {
     pub command: Command,
     key_len: u16,
@@ -600,7 +600,7 @@ impl ResponseHeader {
     }
 }
 
-#[deriving(Clone, Show)]
+#[derive(Clone, Show)]
 pub struct RequestPacket {
     pub header: RequestHeader,
     pub extra: Vec<u8>,
@@ -647,7 +647,7 @@ impl RequestPacket {
     }
 }
 
-#[deriving(Clone, Show)]
+#[derive(Clone, Show)]
 pub struct ResponsePacket {
     pub header: ResponseHeader,
     pub extra: Vec<u8>,
