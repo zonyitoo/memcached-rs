@@ -219,14 +219,14 @@ impl MultiOperation for Client {
             for (key, v) in kv.into_iter() {
                 let svr_idx = self.find_server_index_by_key(key.as_slice());
 
-                match svrkey.entry(svr_idx) {
+                match svrkey.entry(&svr_idx) {
                     Entry::Occupied(entry) => {
                         entry.into_mut().insert(key, v);
                     },
                     Entry::Vacant(entry) => {
                         let mut t = TreeMap::new();
                         t.insert(key, v);
-                        entry.set(t);
+                        entry.insert(t);
                     }
                 }
             }
@@ -259,12 +259,12 @@ impl MultiOperation for Client {
             for key in keys.into_iter() {
                 let svr_idx = self.find_server_index_by_key(key.as_slice());
 
-                match svrkey.entry(svr_idx) {
+                match svrkey.entry(&svr_idx) {
                     Entry::Occupied(entry) => {
                         entry.into_mut().push(key);
                     },
                     Entry::Vacant(entry) => {
-                        entry.set(vec![key]);
+                        entry.insert(vec![key]);
                     }
                 }
             }
@@ -297,12 +297,12 @@ impl MultiOperation for Client {
             for key in keys.into_iter() {
                 let svr_idx = self.find_server_index_by_key(key.as_slice());
 
-                match svrkey.entry(svr_idx) {
+                match svrkey.entry(&svr_idx) {
                     Entry::Occupied(entry) => {
                         entry.into_mut().push(key);
                     },
                     Entry::Vacant(entry) => {
-                        entry.set(vec![key]);
+                        entry.insert(vec![key]);
                     }
                 }
             }
@@ -454,7 +454,7 @@ mod test {
     use std::rand::random;
 
     fn generate_data(len: uint) -> Vec<u8> {
-        Vec::from_fn(len, |_| random())
+        range(0, len).map(|_| random()).collect()
     }
 
     #[bench]
