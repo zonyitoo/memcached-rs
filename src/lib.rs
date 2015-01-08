@@ -24,9 +24,8 @@
 #![crate_name = "memcached"]
 
 #![feature(phase)]
-#![feature(macro_rules)]
 
-#[phase(plugin, link)]
+#[macro_use]
 extern crate log;
 extern crate crc32;
 extern crate test;
