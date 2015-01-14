@@ -634,14 +634,14 @@ impl RequestPacket {
     pub fn read_from(reader: &mut Reader) -> IoResult<RequestPacket> {
         let header = try!(RequestHeader::read_from(reader));
 
-        let extra_len = header.extra_len as uint;
-        let key_len = header.key_len as uint;
-        let value_len = header.body_len as uint - extra_len - key_len;
+        let extra_len = header.extra_len as usize;
+        let key_len = header.key_len as usize;
+        let value_len = header.body_len as usize - extra_len - key_len;
 
         Ok(RequestPacket {
             header: header,
-            extra: try!(reader.read_exact(extra_len as uint)),
-            key: try!(reader.read_exact(key_len as uint)),
+            extra: try!(reader.read_exact(extra_len as usize)),
+            key: try!(reader.read_exact(key_len as usize)),
             value: try!(reader.read_exact(value_len)),
         })
     }
@@ -681,9 +681,9 @@ impl ResponsePacket {
     pub fn read_from(reader: &mut Reader) -> IoResult<ResponsePacket> {
         let header = try!(ResponseHeader::read_from(reader));
 
-        let extra_len = header.extra_len as uint;
-        let key_len = header.key_len as uint;
-        let value_len = header.body_len as uint - extra_len - key_len;
+        let extra_len = header.extra_len as usize;
+        let key_len = header.key_len as usize;
+        let value_len = header.body_len as usize - extra_len - key_len;
 
         Ok(ResponsePacket {
             header: header,

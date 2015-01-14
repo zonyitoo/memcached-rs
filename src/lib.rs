@@ -23,7 +23,9 @@
 #![crate_type = "lib"]
 #![crate_name = "memcached"]
 
-#![feature(phase)]
+#![feature(box_syntax)]
+
+#![allow(unstable)]
 
 #[macro_use]
 extern crate log;

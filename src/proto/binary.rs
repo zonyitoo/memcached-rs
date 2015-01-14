@@ -52,7 +52,7 @@ macro_rules! try_response(
             }
         }
     });
-    ($packet:expr, ignore: $($ignored:pat)|+) => ({
+    ($packet:expr, ignore: $($ignored:pat),+) => ({
         let pk = $packet;
         match pk.header.status {
             $(
@@ -547,7 +547,7 @@ impl<T: Reader + Writer + Clone + Send> MultiOperation for BinaryProto<T> {
 
         loop {
             let resp_packet = try_io!(ResponsePacket::read_from(&mut self.stream));
-            let resp = try_response!(resp_packet, ignore: Status::NoError | Status::KeyNotFound);
+            let resp = try_response!(resp_packet, ignore: Status::NoError, Status::KeyNotFound);
 
             if resp.header.command == Command::Noop {
                 return Ok(());

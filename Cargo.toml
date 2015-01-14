@@ -10,4 +10,4 @@ name = "memcached"
 path = "src/crc32"
 
 [dependencies.collect]
-git = "https://github.com/Gankro/collect-rs.git"
+collect = "*"

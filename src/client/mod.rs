@@ -102,7 +102,7 @@ impl Clone for Server {
 pub struct Client {
     servers: Vec<Box<Server>>,
     key_hasher: Crc32,
-    bucket: Vec<uint>,
+    bucket: Vec<usize>,
 }
 
 impl Client {
@@ -112,7 +112,7 @@ impl Client {
     /// as a array of tuples in this form
     ///
     /// `(address, weight)`.
-    pub fn connect(svrs: &[(AddrType, uint)], p: proto::ProtoType) -> IoResult<Client> {
+    pub fn connect(svrs: &[(AddrType, usize)], p: proto::ProtoType) -> IoResult<Client> {
         if svrs.len() == 0 {
             return Err(IoError {
                 kind: OtherIoError,
@@ -136,9 +136,9 @@ impl Client {
         })
     }
 
-    fn find_server_index_by_key(&mut self, key: &[u8]) -> uint {
+    fn find_server_index_by_key(&mut self, key: &[u8]) -> usize {
         let hash = (self.key_hasher.crc(key) >> 16) & 0x7fff;
-        self.bucket[(hash as uint) % self.bucket.len()]
+        self.bucket[(hash as usize) % self.bucket.len()]
     }
 
     fn find_server_by_key(&mut self, key: &[u8]) -> &mut Box<Server> {
@@ -215,11 +215,11 @@ impl Operation for Client {
 impl MultiOperation for Client {
     fn set_multi(&mut self, kv: TreeMap<Vec<u8>, (Vec<u8>, u32, u32)>) -> MemCachedResult<()> {
         let sk = {
-            let mut svrkey: HashMap<uint, TreeMap<Vec<u8>, (Vec<u8>, u32, u32)>> = HashMap::new();
+            let mut svrkey: HashMap<usize, TreeMap<Vec<u8>, (Vec<u8>, u32, u32)>> = HashMap::new();
             for (key, v) in kv.into_iter() {
                 let svr_idx = self.find_server_index_by_key(key.as_slice());
 
-                match svrkey.entry(&svr_idx) {
+                match svrkey.entry(svr_idx) {
                     Entry::Occupied(entry) => {
                         entry.into_mut().insert(key, v);
                     },
@@ -241,7 +241,7 @@ impl MultiOperation for Client {
                 let r = svr.proto.set_multi(v);
                 tx2.send(r).unwrap();
                 drop(tx2);
-            }).detach();
+            });
             chans.push(rx2);
         }
 
@@ -255,11 +255,11 @@ impl MultiOperation for Client {
 
     fn delete_multi(&mut self, keys: Vec<Vec<u8>>) -> MemCachedResult<()> {
         let sk = {
-            let mut svrkey: HashMap<uint, Vec<Vec<u8>>> = HashMap::new();
+            let mut svrkey: HashMap<usize, Vec<Vec<u8>>> = HashMap::new();
             for key in keys.into_iter() {
                 let svr_idx = self.find_server_index_by_key(key.as_slice());
 
-                match svrkey.entry(&svr_idx) {
+                match svrkey.entry(svr_idx) {
                     Entry::Occupied(entry) => {
                         entry.into_mut().push(key);
                     },
@@ -279,7 +279,7 @@ impl MultiOperation for Client {
                 let r = svr.proto.delete_multi(v);
                 tx2.send(r).unwrap();
                 drop(tx2);
-            }).detach();
+            });
             chans.push(rx2);
         }
 
@@ -293,11 +293,11 @@ impl MultiOperation for Client {
 
     fn get_multi(&mut self, keys: Vec<Vec<u8>>) -> MemCachedResult<TreeMap<Vec<u8>, (Vec<u8>, u32)>> {
         let sk = {
-            let mut svrkey: HashMap<uint, Vec<Vec<u8>>> = HashMap::new();
+            let mut svrkey: HashMap<usize, Vec<Vec<u8>>> = HashMap::new();
             for key in keys.into_iter() {
                 let svr_idx = self.find_server_index_by_key(key.as_slice());
 
-                match svrkey.entry(&svr_idx) {
+                match svrkey.entry(svr_idx) {
                     Entry::Occupied(entry) => {
                         entry.into_mut().push(key);
                     },
@@ -317,7 +317,7 @@ impl MultiOperation for Client {
                 let r = svr.proto.get_multi(v);
                 tx2.send(r).unwrap();
                 drop(tx2);
-            }).detach();
+            });
             chans.push(rx2);
         }
 
@@ -453,7 +453,7 @@ mod test {
     use proto::{Operation, NoReplyOperation, ProtoType};
     use std::rand::random;
 
-    fn generate_data(len: uint) -> Vec<u8> {
+    fn generate_data(len: usize) -> Vec<u8> {
         range(0, len).map(|_| random()).collect()
     }
 

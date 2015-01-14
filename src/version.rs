@@ -28,10 +28,10 @@ use std::str::FromStr;
 ///
 /// Version(major, minor, patch)
 #[derive(Copy)]
-pub struct Version(uint, uint, uint);
+pub struct Version(u32, u32, u32);
 
 impl Version {
-    pub fn new(major: uint, minor: uint, patch: uint) -> Version {
+    pub fn new(major: u32, minor: u32, patch: u32) -> Version {
         Version(major, minor, patch)
     }
 }
@@ -55,8 +55,8 @@ macro_rules! try_option(
 impl FromStr for Version {
     fn from_str(s: &str) -> Option<Version> {
         let sp: Vec<&str> = s.split('.').collect();
-        Some(Version::new(try_option!(sp[0].parse::<uint>()),
-                          try_option!(sp[1].parse::<uint>()),
-                          try_option!(sp[2].parse::<uint>())))
+        Some(Version::new(try_option!(sp[0].parse::<u32>()),
+                          try_option!(sp[1].parse::<u32>()),
+                          try_option!(sp[2].parse::<u32>())))
     }
 }
