@@ -19,16 +19,15 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-use std::io::{BufferedStream, MemWriter, BufReader};
+use std::io::{BufferedStream, BufWriter, BufReader};
 use std::string::String;
 use std::str;
 use std::rand::random;
-
-use collect::TreeMap;
+use std::collections::BTreeMap;
 
 use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation};
 use proto::{Error, ErrorKind, Proto};
-use proto::binarydef::{RequestHeader, RequestPacket, ResponsePacket, Command, DataType};
+use proto::binarydef::{RequestHeader, RequestPacket, RequestPacketRef, ResponsePacket, Command, DataType};
 use version::Version;
 
 pub use proto::binarydef::Status;
@@ -104,9 +103,8 @@ impl<T: Reader + Writer + Clone + Send> BinaryProto<T> {
 
     fn send_noop(&mut self) -> Result<u32, Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::Noop, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
+        let req_packet = RequestPacket::new(
+                                Command::Noop, DataType::RawBytes, 0, opaque, 0,
                                 Vec::new(),
                                 Vec::new(),
                                 Vec::new());
@@ -121,16 +119,20 @@ impl<T: Reader + Writer + Clone + Send> BinaryProto<T> {
 impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(8);
-        try_io!(extra_buf.write_be_u32(flags));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 8];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(flags));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Set, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::Set, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -145,16 +147,20 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
 
     fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(8);
-        try_io!(extra_buf.write_be_u32(flags));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 8];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(flags));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Add, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::Add, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -169,12 +175,13 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
 
     fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::Delete, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::Delete, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &[], &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -189,16 +196,20 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
 
     fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(8);
-        try_io!(extra_buf.write_be_u32(flags));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 8];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(flags));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Replace, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::Replace, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -213,12 +224,13 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
 
     fn get(&mut self, key: &[u8]) -> Result<(Vec<u8>, u32), Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::Get, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::Get, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &[], &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -237,12 +249,13 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
 
     fn getk(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32), Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::GetKey, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::GetKey, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &[], &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -261,17 +274,21 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
 
     fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(20);
-        try_io!(extra_buf.write_be_u64(amount));
-        try_io!(extra_buf.write_be_u64(initial));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 20];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u64(amount));
+            try_io!(extra_buf.write_be_u64(initial));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Increment, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -288,17 +305,21 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
 
     fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<u64, Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(20);
-        try_io!(extra_buf.write_be_u64(amount));
-        try_io!(extra_buf.write_be_u64(initial));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 20];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u64(amount));
+            try_io!(extra_buf.write_be_u64(initial));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Decrement, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::Decrement, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -315,12 +336,13 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
 
     fn append(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::Append, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::Append, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &[], value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -336,12 +358,13 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
 
     fn prepend(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::Prepend, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::Prepend, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &[], value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -357,15 +380,19 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
 
     fn touch(&mut self, key: &[u8], expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(4);
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 4];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Touch, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::Touch, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -383,12 +410,13 @@ impl<T: Reader + Writer + Clone + Send> Operation for BinaryProto<T> {
 impl<T: Reader + Writer + Clone + Send> ServerOperation for BinaryProto<T> {
     fn quit(&mut self) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::Quit, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                Vec::new(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::Quit, DataType::RawBytes, 0, opaque, 0,
+                                                     &[], &[], &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                &[],
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -404,15 +432,19 @@ impl<T: Reader + Writer + Clone + Send> ServerOperation for BinaryProto<T> {
 
     fn flush(&mut self, expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(4);
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 4];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Flush, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                Vec::new(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::Flush, DataType::RawBytes, 0, opaque, 0,
+                                                     &[], &extra, &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                &[],
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -438,12 +470,12 @@ impl<T: Reader + Writer + Clone + Send> ServerOperation for BinaryProto<T> {
 
     fn version(&mut self) -> Result<Version, Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::Version, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                Vec::new(),
-                                Vec::new());
+        let req_header = RequestHeader::new(Command::Version, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                &[],
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -465,19 +497,19 @@ impl<T: Reader + Writer + Clone + Send> ServerOperation for BinaryProto<T> {
         })
     }
 
-    fn stat(&mut self) -> Result<TreeMap<String, String>, Error> {
+    fn stat(&mut self) -> Result<BTreeMap<String, String>, Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::Stat, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                Vec::new(),
-                                Vec::new());
+        let req_header = RequestHeader::new(Command::Stat, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                &[],
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
 
-        let mut result = TreeMap::new();
+        let mut result = BTreeMap::new();
         loop {
             let resp_packet = try_io!(ResponsePacket::read_from(&mut self.stream));
             if resp_packet.header.opaque != opaque {
@@ -507,16 +539,20 @@ impl<T: Reader + Writer + Clone + Send> ServerOperation for BinaryProto<T> {
 }
 
 impl<T: Reader + Writer + Clone + Send> MultiOperation for BinaryProto<T> {
-    fn set_multi(&mut self, kv: TreeMap<Vec<u8>, (Vec<u8>, u32, u32)>) -> Result<(), Error> {
+    fn set_multi(&mut self, kv: BTreeMap<&[u8], (&[u8], u32, u32)>) -> Result<(), Error> {
         for (key, (value, flags, expiration)) in kv.into_iter() {
-            let mut extra_buf = MemWriter::with_capacity(8);
-            try_io!(extra_buf.write_be_u32(flags));
-            try_io!(extra_buf.write_be_u32(expiration));
+            let mut extra = [0u8; 8];
+            {
+                let mut extra_buf = BufWriter::new(&mut extra);
+                try_io!(extra_buf.write_be_u32(flags));
+                try_io!(extra_buf.write_be_u32(expiration));
+            }
 
-            let req_header = RequestHeader::new(Command::SetQuietly, DataType::RawBytes, 0, 0, 0);
-            let mut req_packet = RequestPacket::new(
-                                    req_header,
-                                    extra_buf.into_inner(),
+            let req_header = RequestHeader::from_payload(Command::SetQuietly, DataType::RawBytes, 0, 0, 0,
+                                                         key, &extra, value);
+            let req_packet = RequestPacketRef::new(
+                                    &req_header,
+                                    &extra,
                                     key,
                                     value);
 
@@ -532,14 +568,15 @@ impl<T: Reader + Writer + Clone + Send> MultiOperation for BinaryProto<T> {
         }
     }
 
-    fn delete_multi(&mut self, keys: Vec<Vec<u8>>) -> Result<(), Error> {
-        for key in keys.into_iter() {
-            let req_header = RequestHeader::new(Command::DeleteQuietly, DataType::RawBytes, 0, 0, 0);
-            let mut req_packet = RequestPacket::new(
-                                    req_header,
-                                    Vec::new(),
-                                    key,
-                                    Vec::new());
+    fn delete_multi(&mut self, keys: &[&[u8]]) -> Result<(), Error> {
+        for key in keys.iter() {
+            let req_header = RequestHeader::from_payload(Command::DeleteQuietly, DataType::RawBytes, 0, 0, 0,
+                                                         *key, &[], &[]);
+            let req_packet = RequestPacketRef::new(
+                                    &req_header,
+                                    &[],
+                                    *key,
+                                    &[]);
 
             try_io!(req_packet.write_to(&mut self.stream));
         }
@@ -555,21 +592,22 @@ impl<T: Reader + Writer + Clone + Send> MultiOperation for BinaryProto<T> {
         }
     }
 
-    fn get_multi(&mut self, keys: Vec<Vec<u8>>) -> Result<TreeMap<Vec<u8>, (Vec<u8>, u32)>, Error> {
+    fn get_multi(&mut self, keys: &[&[u8]]) -> Result<BTreeMap<Vec<u8>, (Vec<u8>, u32)>, Error> {
 
-        for key in keys.into_iter() {
-            let req_header = RequestHeader::new(Command::GetKeyQuietly, DataType::RawBytes, 0, 0, 0);
-            let mut req_packet = RequestPacket::new(
-                                    req_header,
-                                    Vec::new(),
-                                    key,
-                                    Vec::new());
+        for key in keys.iter() {
+            let req_header = RequestHeader::from_payload(Command::GetKeyQuietly, DataType::RawBytes, 0, 0, 0,
+                                                         *key, &[], &[]);
+            let req_packet = RequestPacketRef::new(
+                                    &req_header,
+                                    &[],
+                                    *key,
+                                    &[]);
 
             try_io!(req_packet.write_to(&mut self.stream));
         }
         try!(self.send_noop());
 
-        let mut result = TreeMap::new();
+        let mut result = BTreeMap::new();
         loop {
             let resp_packet = try_io!(ResponsePacket::read_from(&mut self.stream));
             let resp = try_response!(resp_packet);
@@ -589,16 +627,20 @@ impl<T: Reader + Writer + Clone + Send> MultiOperation for BinaryProto<T> {
 impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
     fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(8);
-        try_io!(extra_buf.write_be_u32(flags));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 8];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(flags));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::SetQuietly, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::SetQuietly, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -608,16 +650,20 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
 
     fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(8);
-        try_io!(extra_buf.write_be_u32(flags));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 8];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(flags));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::AddQuietly, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::AddQuietly, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -627,12 +673,13 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
 
     fn delete_noreply(&mut self, key: &[u8]) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::DeleteQuietly, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::DeleteQuietly, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &[], &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -642,16 +689,20 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
 
     fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(8);
-        try_io!(extra_buf.write_be_u32(flags));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 8];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(flags));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::ReplaceQuietly, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::ReplaceQuietly, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -661,17 +712,21 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
 
     fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(20);
-        try_io!(extra_buf.write_be_u64(amount));
-        try_io!(extra_buf.write_be_u64(initial));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 20];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u64(amount));
+            try_io!(extra_buf.write_be_u64(initial));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::IncrementQuietly, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::IncrementQuietly, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -681,17 +736,21 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
 
     fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(20);
-        try_io!(extra_buf.write_be_u64(amount));
-        try_io!(extra_buf.write_be_u64(initial));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 20];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u64(amount));
+            try_io!(extra_buf.write_be_u64(initial));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::DecrementQuietly, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::DecrementQuietly, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -701,12 +760,13 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
 
     fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::AppendQuietly, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::AppendQuietly, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &[], value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -716,12 +776,13 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
 
     fn prepend_noreply(&mut self, key: &[u8], value: &[u8]) -> Result<(), Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::PrependQuietly, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::PrependQuietly, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &[], value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -733,16 +794,20 @@ impl<T: Reader + Writer + Clone + Send> NoReplyOperation for BinaryProto<T> {
 impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
     fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(8);
-        try_io!(extra_buf.write_be_u32(flags));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 8];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(flags));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Set, DataType::RawBytes, 0, opaque, cas);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::Set, DataType::RawBytes, 0, opaque, cas,
+                                                     key, &extra, value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -757,16 +822,20 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
 
     fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> Result<u64, Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(8);
-        try_io!(extra_buf.write_be_u32(flags));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 8];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(flags));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Add, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::Add, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &extra, value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -781,16 +850,20 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
 
     fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> Result<u64, Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(8);
-        try_io!(extra_buf.write_be_u32(flags));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 8];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(flags));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Replace, DataType::RawBytes, 0, opaque, cas);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::Replace, DataType::RawBytes, 0, opaque, cas,
+                                                     key, &extra, value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -805,12 +878,13 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
 
     fn get_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, u32, u64), Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::Get, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::Get, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &[], &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -829,12 +903,13 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
 
     fn getk_cas(&mut self, key: &[u8]) -> Result<(Vec<u8>, Vec<u8>, u32, u64), Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::GetKey, DataType::RawBytes, 0, opaque, 0);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::GetKey, DataType::RawBytes, 0, opaque, 0,
+                                                     key, &[], &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -854,17 +929,21 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
     fn increment_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
             -> Result<(u64, u64), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(20);
-        try_io!(extra_buf.write_be_u64(amount));
-        try_io!(extra_buf.write_be_u64(initial));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 20];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u64(amount));
+            try_io!(extra_buf.write_be_u64(initial));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Increment, DataType::RawBytes, 0, opaque, cas);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, cas,
+                                                     key, &extra, &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -882,17 +961,21 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
     fn decrement_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
             -> Result<(u64, u64), Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(20);
-        try_io!(extra_buf.write_be_u64(amount));
-        try_io!(extra_buf.write_be_u64(initial));
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 20];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u64(amount));
+            try_io!(extra_buf.write_be_u64(initial));
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Decrement, DataType::RawBytes, 0, opaque, cas);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::Decrement, DataType::RawBytes, 0, opaque, cas,
+                                                     key, &extra, &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -909,12 +992,13 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
 
     fn append_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::Append, DataType::RawBytes, 0, opaque, cas);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::Append, DataType::RawBytes, 0, opaque, cas,
+                                                     key, &[], value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -930,12 +1014,13 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
 
     fn prepend_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> Result<u64, Error> {
         let opaque = random::<u32>();
-        let req_header = RequestHeader::new(Command::Prepend, DataType::RawBytes, 0, opaque, cas);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                Vec::new(),
-                                key.to_vec(),
-                                value.to_vec());
+        let req_header = RequestHeader::from_payload(Command::Prepend, DataType::RawBytes, 0, opaque, cas,
+                                                     key, &[], value);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &[],
+                                key,
+                                value);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -951,15 +1036,19 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
 
     fn touch_cas(&mut self, key: &[u8], expiration: u32, cas: u64) -> Result<u64, Error> {
         let opaque = random::<u32>();
-        let mut extra_buf = MemWriter::with_capacity(4);
-        try_io!(extra_buf.write_be_u32(expiration));
+        let mut extra = [0u8; 4];
+        {
+            let mut extra_buf = BufWriter::new(&mut extra);
+            try_io!(extra_buf.write_be_u32(expiration));
+        }
 
-        let req_header = RequestHeader::new(Command::Touch, DataType::RawBytes, 0, opaque, cas);
-        let mut req_packet = RequestPacket::new(
-                                req_header,
-                                extra_buf.into_inner(),
-                                key.to_vec(),
-                                Vec::new());
+        let req_header = RequestHeader::from_payload(Command::Touch, DataType::RawBytes, 0, opaque, cas,
+                                                     key, &extra, &[]);
+        let req_packet = RequestPacketRef::new(
+                                &req_header,
+                                &extra,
+                                key,
+                                &[]);
 
         try_io!(req_packet.write_to(&mut self.stream));
         try_io!(self.stream.flush());
@@ -977,7 +1066,7 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
 #[cfg(test)]
 mod test {
     use std::io::net::tcp::TcpStream;
-    use collect::TreeMap;
+    use std::collections::BTreeMap;
     use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation, BinaryProto};
 
     const SERVER_ADDR: &'static str = "127.0.0.1:11211";
@@ -989,48 +1078,53 @@ mod test {
 
     #[test]
     fn test_set_get_delete() {
+        const KEY: &'static [u8] = b"test:set_get_delete";
+        const VAL: &'static [u8] = b"world";
+
         let mut client = get_client();
-        assert!(client.set(b"test:Hello", b"world", 0xdeadbeef, 120).is_ok());
+        assert!(client.set(KEY, VAL, 0xdeadbeef, 120).is_ok());
 
-        let get_resp = client.get(b"test:Hello");
+        let get_resp = client.get(KEY);
         assert!(get_resp.is_ok());
-        assert_eq!(get_resp.unwrap(), (b"world".to_vec(), 0xdeadbeef));
+        assert_eq!(get_resp.unwrap(), (VAL.to_vec(), 0xdeadbeef));
 
-        let getk_resp = client.getk(b"test:Hello");
+        let getk_resp = client.getk(KEY);
         assert!(getk_resp.is_ok());
-        assert_eq!(getk_resp.unwrap(), (b"test:Hello".to_vec(), b"world".to_vec(), 0xdeadbeef));
+        assert_eq!(getk_resp.unwrap(), (KEY.to_vec(), VAL.to_vec(), 0xdeadbeef));
 
-        assert!(client.delete(b"test:Hello").is_ok());
+        assert!(client.delete(KEY).is_ok());
     }
 
     #[test]
     fn test_incr_decr() {
+        const KEY: &'static [u8] = b"test:incr_decr";
+
         let mut client = get_client();
         {
-            let incr_resp = client.increment(b"test:incr", 1, 0, 120);
+            let incr_resp = client.increment(KEY, 1, 0, 120);
             assert!(incr_resp.is_ok());
             assert_eq!(incr_resp.unwrap(), 0);
         }
 
         {
-            let incr_resp = client.increment(b"test:incr", 10, 0, 120);
+            let incr_resp = client.increment(KEY, 10, 0, 120);
             assert!(incr_resp.is_ok());
             assert_eq!(incr_resp.unwrap(), 10);
         }
 
         {
-            let decr_resp = client.decrement(b"test:incr", 5, 0, 120);
+            let decr_resp = client.decrement(KEY, 5, 0, 120);
             assert!(decr_resp.is_ok());
             assert_eq!(decr_resp.unwrap(), 5);
         }
 
         {
-            let decr_resp = client.decrement(b"test:incr", 20, 0, 120);
+            let decr_resp = client.decrement(KEY, 20, 0, 120);
             assert!(decr_resp.is_ok());
             assert_eq!(decr_resp.unwrap(), 0);
         }
 
-        assert!(client.delete(b"test:incr").is_ok())
+        assert!(client.delete(KEY).is_ok())
     }
 
     #[test]
@@ -1062,23 +1156,27 @@ mod test {
 
     #[test]
     fn test_add() {
+        const KEY: &'static [u8] = b"test:add";
+        const INIT_VAL: &'static [u8] = b"initial";
+        const ADD_VAL: &'static [u8] = b"added";
+
         let mut client = get_client();
 
         {
-            let add_resp = client.add(b"test:add_key", b"initial", 0xdeadbeef, 120);
+            let add_resp = client.add(KEY, INIT_VAL, 0xdeadbeef, 120);
             assert!(add_resp.is_ok());
         }
 
         {
-            let get_resp = client.get(b"test:add_key");
+            let get_resp = client.get(KEY);
             assert!(get_resp.is_ok());
 
-            assert_eq!(get_resp.unwrap(), (b"initial".to_vec(), 0xdeadbeef));
-            let add_resp = client.add(b"test:add_key", b"added", 0xdeadbeef, 120);
+            assert_eq!(get_resp.unwrap(), (INIT_VAL.to_vec(), 0xdeadbeef));
+            let add_resp = client.add(KEY, ADD_VAL, 0xdeadbeef, 120);
             assert!(add_resp.is_err());
         }
 
-        assert!(client.delete(b"test:add_key").is_ok());
+        assert!(client.delete(KEY).is_ok());
     }
 
     #[test]
@@ -1156,17 +1254,17 @@ mod test {
     fn test_set_get_delete_muti() {
         let mut client = get_client();
 
-        let mut data = TreeMap::new();
-        data.insert(b"test:multi_hello1".to_vec(), (b"world1".to_vec(), 0xdeadbeef, 120));
-        data.insert(b"test:multi_hello2".to_vec(), (b"world2".to_vec(), 0xdeadbeef, 120));
-        data.insert(b"test:multi_lastone".to_vec(), (b"last!".to_vec(), 0xdeadbeef, 120));
+        let mut data = BTreeMap::new();
+        data.insert(b"test:multi_hello1", (b"world1", 0xdeadbeef, 120));
+        data.insert(b"test:multi_hello2", (b"world2", 0xdeadbeef, 120));
+        data.insert(b"test:multi_lastone", (b"last!", 0xdeadbeef, 120));
 
         let set_resp = client.set_multi(data);
         assert!(set_resp.is_ok());
 
-        let get_resp = client.get_multi(vec![b"test:multi_hello1".to_vec(),
-                                             b"test:multi_hello2".to_vec(),
-                                             b"test:multi_lastone".to_vec()]);
+        let get_resp = client.get_multi(&[b"test:multi_hello1",
+                                          b"test:multi_hello2",
+                                          b"test:multi_lastone"]);
         assert!(get_resp.is_ok());
 
         let get_resp_map = get_resp.as_ref().unwrap();
@@ -1177,13 +1275,13 @@ mod test {
         assert_eq!(get_resp_map.get(&b"test:multi_lastone".to_vec()),
                    Some(&(b"last!".to_vec(), 0xdeadbeef)));
 
-        let del_resp = client.delete_multi(vec![b"test:multi_hello1".to_vec(),
-                                                b"test:multi_hello2".to_vec()]);
+        let del_resp = client.delete_multi(&[b"test:multi_hello1",
+                                             b"test:multi_hello2"]);
         assert!(del_resp.is_ok());
 
-        let get_resp = client.get_multi(vec![b"test:multi_hello1".to_vec(),
-                                             b"test:multi_hello2".to_vec(),
-                                             b"test:multi_lastone".to_vec()]);
+        let get_resp = client.get_multi(&[b"test:multi_hello1",
+                                          b"test:multi_hello2",
+                                          b"test:multi_lastone"]);
         assert!(get_resp.is_ok());
 
         let get_resp_map = get_resp.as_ref().unwrap();
@@ -1194,8 +1292,8 @@ mod test {
         assert_eq!(get_resp_map.get(&b"test:multi_lastone".to_vec()),
                    Some(&(b"last!".to_vec(), 0xdeadbeef)));
 
-        let del_resp = client.delete_multi(vec![b"lastone".to_vec(),
-                                                b"not_exists!!!!".to_vec()]);
+        let del_resp = client.delete_multi(&[b"lastone",
+                                             b"not_exists!!!!"]);
         assert!(del_resp.is_ok());
     }
 
@@ -1302,27 +1400,27 @@ mod test {
 
     #[test]
     fn test_append_prepend_cas() {
-        let key = b"test:append_prepend_cas";
+        const KEY: &'static [u8] = b"test:append_prepend_cas";
         let mut client = get_client();
 
-        let set_resp = client.set_cas(key, b"appended", 0, 120, 0);
+        let set_resp = client.set_cas(KEY, b"appended", 0, 120, 0);
         assert!(set_resp.is_ok());
         let set_cas = set_resp.unwrap();
 
-        let ap_resp = client.append_cas(key, b"appended", set_cas + 1);
+        let ap_resp = client.append_cas(KEY, b"appended", set_cas + 1);
         assert!(ap_resp.is_err());
 
-        let ap_resp = client.append_cas(key, b"appended", set_cas);
+        let ap_resp = client.append_cas(KEY, b"appended", set_cas);
         assert!(ap_resp.is_ok());
         let ap_cas = ap_resp.unwrap();
 
-        let pr_resp = client.prepend_cas(key, b"prepend", ap_cas + 1);
+        let pr_resp = client.prepend_cas(KEY, b"prepend", ap_cas + 1);
         assert!(pr_resp.is_err());
 
-        let pr_resp = client.prepend_cas(key, b"prepend", ap_cas);
+        let pr_resp = client.prepend_cas(KEY, b"prepend", ap_cas);
         assert!(pr_resp.is_ok());
 
-        assert!(client.delete(key).is_ok());
+        assert!(client.delete(KEY).is_ok());
     }
 
     #[test]

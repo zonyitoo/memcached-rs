@@ -8,6 +8,3 @@ name = "memcached"
 
 [dependencies.crc32]
 path = "src/crc32"
-
-[dependencies.collect]
-collect = "*"

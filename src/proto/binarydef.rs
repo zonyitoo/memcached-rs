@@ -133,7 +133,7 @@ const OPCODE_TAP_CHECKPOINT_END: u8 = 0x47;
 const DATA_TYPE_RAW_BYTES: u8 = 0x00;
 
 /// Memcached response status
-#[derive(Copy, Clone, Show, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Status {
     NoError,
     KeyNotFound,
@@ -222,7 +222,7 @@ impl Status {
     }
 }
 
-#[derive(Clone, Show, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Command {
     Get,
     Set,
@@ -413,7 +413,7 @@ impl Command {
     }
 }
 
-#[derive(Clone, Show, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataType {
     RawBytes,
 }
@@ -449,7 +449,7 @@ impl DataType {
 //   |                                                               |
 //   +---------------+---------------+---------------+---------------+
 //   Total 24 bytes
-#[derive(Clone, Show)]
+#[derive(Clone, Debug)]
 pub struct RequestHeader {
     pub command: Command,
     key_len: u16,
@@ -462,17 +462,27 @@ pub struct RequestHeader {
 }
 
 impl RequestHeader {
-    pub fn new(cmd: Command, dtype: DataType, vbid: u16, opaque: u32, cas: u64) -> RequestHeader {
+    pub fn new(cmd: Command, dtype: DataType, vbid: u16, opaque: u32, cas: u64,
+               key_len: u16, extra_len: u8, body_len: u32) -> RequestHeader {
         RequestHeader {
             command: cmd,
-            key_len: 0,
-            extra_len: 0,
+            key_len: key_len,
+            extra_len: extra_len,
             data_type: dtype,
             vbucket_id: vbid,
-            body_len: 0,
+            body_len: body_len,
             opaque: opaque,
             cas: cas,
         }
+    }
+
+    pub fn from_payload(cmd: Command, dtype: DataType, vbid: u16, opaque: u32, cas: u64,
+                        key: &[u8], extra: &[u8], value: &[u8]) -> RequestHeader {
+        let key_len = key.len() as u16;
+        let extra_len = extra.len() as u8;
+        let body_len = (key.len() + extra.len() + value.len()) as u32;
+
+        RequestHeader::new(cmd, dtype, vbid, opaque, cas, key_len, extra_len, body_len)
     }
 
     pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
@@ -531,7 +541,7 @@ impl RequestHeader {
 //   |                                                               |
 //   +---------------+---------------+---------------+---------------+
 //   Total 24 bytes
-#[derive(Clone, Show)]
+#[derive(Clone, Debug)]
 pub struct ResponseHeader {
     pub command: Command,
     key_len: u16,
@@ -544,17 +554,27 @@ pub struct ResponseHeader {
 }
 
 impl ResponseHeader {
-    pub fn new(cmd: Command, dtype: DataType, status: Status, opaque: u32, cas: u64) -> ResponseHeader {
+    pub fn new(cmd: Command, dtype: DataType, status: Status, opaque: u32, cas: u64,
+               key_len: u16, extra_len: u8, body_len: u32) -> ResponseHeader {
         ResponseHeader {
             command: cmd,
-            key_len: 0,
-            extra_len: 0,
+            key_len: key_len,
+            extra_len: extra_len,
             data_type: dtype,
             status: status,
-            body_len: 0,
+            body_len: body_len,
             opaque: opaque,
             cas: cas,
         }
+    }
+
+    pub fn from_payload(cmd: Command, dtype: DataType, status: Status, opaque: u32, cas: u64,
+                        key: &[u8], extra: &[u8], value: &[u8]) -> ResponseHeader {
+        let key_len = key.len() as u16;
+        let extra_len = extra.len() as u8;
+        let body_len = (key.len() + extra.len() + value.len()) as u32;
+
+        ResponseHeader::new(cmd, dtype, status, opaque, cas, key_len, extra_len, body_len)
     }
 
     pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
@@ -600,7 +620,7 @@ impl ResponseHeader {
     }
 }
 
-#[derive(Clone, Show)]
+#[derive(Clone, Debug)]
 pub struct RequestPacket {
     pub header: RequestHeader,
     pub extra: Vec<u8>,
@@ -609,24 +629,22 @@ pub struct RequestPacket {
 }
 
 impl RequestPacket {
-    pub fn new(header: RequestHeader, extra: Vec<u8>, key: Vec<u8>, value: Vec<u8>) -> RequestPacket {
+    pub fn new(cmd: Command, dtype: DataType, vbid: u16, opaque: u32, cas: u64,
+               extra: Vec<u8>, key: Vec<u8>, value: Vec<u8>) -> RequestPacket {
         RequestPacket {
-            header: header,
+            header: RequestHeader::from_payload(cmd, dtype, vbid, opaque, cas,
+                                                &key[], &extra[], &value[]),
             extra: extra,
             key: key,
             value: value,
         }
     }
 
-    pub fn write_to(&mut self, writer: &mut Writer) -> IoResult<()> {
-        self.header.key_len = self.key.len() as u16;
-        self.header.extra_len = self.extra.len() as u8;
-        self.header.body_len = (self.key.len() + self.extra.len() + self.value.len()) as u32;
-
+    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
         try!(self.header.write_to(writer));
-        try!(writer.write(self.extra.as_slice()));
-        try!(writer.write(self.key.as_slice()));
-        try!(writer.write(self.value.as_slice()));
+        try!(writer.write(&self.extra[]));
+        try!(writer.write(&self.key[]));
+        try!(writer.write(&self.value[]));
 
         Ok(())
     }
@@ -645,9 +663,41 @@ impl RequestPacket {
             value: try!(reader.read_exact(value_len)),
         })
     }
+
+    pub fn as_ref<'a>(&'a self) -> RequestPacketRef<'a> {
+        RequestPacketRef::new(&self.header, &self.extra[], &self.key[], &self.value[])
+    }
 }
 
-#[derive(Clone, Show)]
+#[derive(Debug)]
+pub struct RequestPacketRef<'a> {
+    pub header: &'a RequestHeader,
+    pub extra: &'a [u8],
+    pub key: &'a [u8],
+    pub value: &'a [u8],
+}
+
+impl<'a> RequestPacketRef<'a> {
+    pub fn new(header: &'a RequestHeader, extra: &'a [u8], key: &'a [u8], value: &'a [u8]) -> RequestPacketRef<'a> {
+        RequestPacketRef {
+            header: header,
+            extra: extra,
+            key: key,
+            value: value,
+        }
+    }
+
+    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
+        try!(self.header.write_to(writer));
+        try!(writer.write(self.extra));
+        try!(writer.write(self.key));
+        try!(writer.write(self.value));
+
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct ResponsePacket {
     pub header: ResponseHeader,
     pub extra: Vec<u8>,
@@ -656,24 +706,22 @@ pub struct ResponsePacket {
 }
 
 impl ResponsePacket {
-    pub fn new(header: ResponseHeader, extra: Vec<u8>, key: Vec<u8>, value: Vec<u8>) -> ResponsePacket {
+    pub fn new(cmd: Command, dtype: DataType, status: Status, opaque: u32, cas: u64,
+               extra: Vec<u8>, key: Vec<u8>, value: Vec<u8>) -> ResponsePacket {
         ResponsePacket {
-            header: header,
+            header: ResponseHeader::from_payload(cmd, dtype, status, opaque, cas,
+                                                 &key[], &extra[], &value[]),
             extra: extra,
             key: key,
             value: value,
         }
     }
 
-    pub fn write_to(&mut self, writer: &mut Writer) -> IoResult<()> {
-        self.header.key_len = self.key.len() as u16;
-        self.header.extra_len = self.extra.len() as u8;
-        self.header.body_len = (self.key.len() + self.extra.len() + self.value.len()) as u32;
-
+    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
         try!(self.header.write_to(writer));
-        try!(writer.write(self.extra.as_slice()));
-        try!(writer.write(self.key.as_slice()));
-        try!(writer.write(self.value.as_slice()));
+        try!(writer.write(&self.extra[]));
+        try!(writer.write(&self.key[]));
+        try!(writer.write(&self.value[]));
 
         Ok(())
     }
@@ -694,6 +742,33 @@ impl ResponsePacket {
     }
 }
 
+pub struct ResponsePacketRef<'a> {
+    pub header: &'a ResponseHeader,
+    pub extra: &'a [u8],
+    pub key: &'a [u8],
+    pub value: &'a [u8],
+}
+
+impl<'a> ResponsePacketRef<'a> {
+    pub fn new(header: &'a ResponseHeader, extra: &'a [u8], key: &'a [u8], value: &'a [u8]) -> ResponsePacketRef<'a> {
+        ResponsePacketRef {
+            header: header,
+            extra: extra,
+            key: key,
+            value: value,
+        }
+    }
+
+    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
+        try!(self.header.write_to(writer));
+        try!(writer.write(self.extra));
+        try!(writer.write(self.key));
+        try!(writer.write(self.value));
+
+        Ok(())
+    }
+}
+
 fn make_io_error(desc: &'static str, detail: Option<String>) -> IoError {
     IoError {
         kind: OtherIoError,
@@ -708,7 +783,7 @@ mod test {
     use std::io::BufferedStream;
 
     use proto;
-    use proto::binarydef::{RequestHeader, RequestPacket, ResponsePacket, Command, DataType};
+    use proto::binarydef::{RequestPacket, ResponsePacket, Command, DataType};
 
     fn test_stream() -> TcpStream {
         TcpStream::connect("127.0.0.1:11211").unwrap()
@@ -719,9 +794,8 @@ mod test {
         let mut stream = BufferedStream::new(test_stream());
 
         {
-            let req_header = RequestHeader::new(Command::Set, DataType::RawBytes, 0, 0, 0);
-            let mut req_packet = RequestPacket::new(
-                                req_header,
+            let req_packet = RequestPacket::new(
+                                Command::Set, DataType::RawBytes, 0, 0, 0,
                                 vec![0xde, 0xad, 0xbe, 0xef, 0x00, 0x00, 0x0e, 0x10],
                                 b"test:binary_proto:hello".to_vec(),
                                 b"world".to_vec());
@@ -735,9 +809,8 @@ mod test {
         }
 
         {
-            let req_header = RequestHeader::new(Command::Get, DataType::RawBytes, 0, 0, 0);
-            let mut req_packet = RequestPacket::new(
-                                req_header,
+            let req_packet = RequestPacket::new(
+                                Command::Get, DataType::RawBytes, 0, 0, 0,
                                 vec![],
                                 b"test:binary_proto:hello".to_vec(),
                                 vec![]);
@@ -752,9 +825,8 @@ mod test {
         }
 
         {
-            let req_header = RequestHeader::new(Command::Delete, DataType::RawBytes, 0, 0, 0);
-            let mut req_packet = RequestPacket::new(
-                                req_header,
+            let req_packet = RequestPacket::new(
+                                Command::Delete, DataType::RawBytes, 0, 0, 0,
                                 vec![],
                                 b"test:binary_proto:hello".to_vec(),
                                 vec![]);

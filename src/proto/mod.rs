@@ -22,7 +22,7 @@
 //! Memcached protocol
 
 use std::fmt::{Display, Formatter, self};
-use collect::TreeMap;
+use std::collections::BTreeMap;
 use std::io;
 
 use version;
@@ -111,13 +111,13 @@ pub trait ServerOperation {
     fn flush(&mut self, expiration: u32) -> MemCachedResult<()>;
     fn noop(&mut self) -> MemCachedResult<()>;
     fn version(&mut self) -> MemCachedResult<version::Version>;
-    fn stat(&mut self) -> MemCachedResult<TreeMap<String, String>>;
+    fn stat(&mut self) -> MemCachedResult<BTreeMap<String, String>>;
 }
 
 pub trait MultiOperation {
-    fn set_multi(&mut self, kv: TreeMap<Vec<u8>, (Vec<u8>, u32, u32)>) -> MemCachedResult<()>;
-    fn delete_multi(&mut self, keys: Vec<Vec<u8>>) -> MemCachedResult<()>;
-    fn get_multi(&mut self, keys: Vec<Vec<u8>>) -> MemCachedResult<TreeMap<Vec<u8>, (Vec<u8>, u32)>>;
+    fn set_multi(&mut self, kv: BTreeMap<&[u8], (&[u8], u32, u32)>) -> MemCachedResult<()>;
+    fn delete_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<()>;
+    fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<BTreeMap<Vec<u8>, (Vec<u8>, u32)>>;
 }
 
 pub trait NoReplyOperation {

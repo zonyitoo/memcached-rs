@@ -31,7 +31,6 @@
 extern crate log;
 extern crate crc32;
 extern crate test;
-extern crate collect;
 
 pub mod proto;
 pub mod version;

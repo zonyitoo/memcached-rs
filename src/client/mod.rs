@@ -28,8 +28,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::thread::Thread;
 use std::sync::mpsc::channel;
-
-use collect::TreeMap;
+use std::collections::BTreeMap;
 
 use crc32::Crc32;
 
@@ -78,7 +77,7 @@ impl Clone for Server {
 /// ```ignore
 /// extern crate collect;
 ///
-/// use collect::TreeMap;
+/// use collect::BTreeMap;
 /// use memcached::client::{Client, AddrType};
 /// use memcached::proto::{Operation, MultiOperation, NoReplyOperation, CasOperation, ProtoType};
 ///
@@ -89,7 +88,7 @@ impl Clone for Server {
 /// assert_eq!(value.as_slice(), b"Bar");
 /// assert_eq!(flags, 0xdeadbeef);
 ///
-/// let mut data = TreeMap::new();
+/// let mut data = BTreeMap::new();
 /// data.insert(b"key1".to_vec(), (b"val1".to_vec(), 0xdeadbeef, 10));
 /// data.insert(b"key2".to_vec(), (b"val2".to_vec(), 0xcafebabe, 20));
 /// client.set_multi(data).unwrap();
@@ -209,144 +208,6 @@ impl Operation for Client {
     fn touch(&mut self, key: &[u8], expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
         server.proto.touch(key, expiration)
-    }
-}
-
-impl MultiOperation for Client {
-    fn set_multi(&mut self, kv: TreeMap<Vec<u8>, (Vec<u8>, u32, u32)>) -> MemCachedResult<()> {
-        let sk = {
-            let mut svrkey: HashMap<usize, TreeMap<Vec<u8>, (Vec<u8>, u32, u32)>> = HashMap::new();
-            for (key, v) in kv.into_iter() {
-                let svr_idx = self.find_server_index_by_key(key.as_slice());
-
-                match svrkey.entry(svr_idx) {
-                    Entry::Occupied(entry) => {
-                        entry.into_mut().insert(key, v);
-                    },
-                    Entry::Vacant(entry) => {
-                        let mut t = TreeMap::new();
-                        t.insert(key, v);
-                        entry.insert(t);
-                    }
-                }
-            }
-            svrkey
-        };
-
-        let mut chans = Vec::new();
-        for (svr_idx, v) in sk.into_iter() {
-            let (tx2, rx2) = channel();
-            let mut svr = self.servers[svr_idx].clone();
-            Thread::spawn(move || {
-                let r = svr.proto.set_multi(v);
-                tx2.send(r).unwrap();
-                drop(tx2);
-            });
-            chans.push(rx2);
-        }
-
-        let mut result = Ok(());
-        for chan in chans.into_iter() {
-            result = result.or(chan.recv().unwrap());
-        }
-
-        result
-    }
-
-    fn delete_multi(&mut self, keys: Vec<Vec<u8>>) -> MemCachedResult<()> {
-        let sk = {
-            let mut svrkey: HashMap<usize, Vec<Vec<u8>>> = HashMap::new();
-            for key in keys.into_iter() {
-                let svr_idx = self.find_server_index_by_key(key.as_slice());
-
-                match svrkey.entry(svr_idx) {
-                    Entry::Occupied(entry) => {
-                        entry.into_mut().push(key);
-                    },
-                    Entry::Vacant(entry) => {
-                        entry.insert(vec![key]);
-                    }
-                }
-            }
-            svrkey
-        };
-
-        let mut chans = Vec::new();
-        for (svr_idx, v) in sk.into_iter() {
-            let (tx2, rx2) = channel();
-            let mut svr = self.servers[svr_idx].clone();
-            Thread::spawn(move || {
-                let r = svr.proto.delete_multi(v);
-                tx2.send(r).unwrap();
-                drop(tx2);
-            });
-            chans.push(rx2);
-        }
-
-        let mut result = Ok(());
-        for chan in chans.into_iter() {
-            result = result.or(chan.recv().unwrap());
-        }
-
-        result
-    }
-
-    fn get_multi(&mut self, keys: Vec<Vec<u8>>) -> MemCachedResult<TreeMap<Vec<u8>, (Vec<u8>, u32)>> {
-        let sk = {
-            let mut svrkey: HashMap<usize, Vec<Vec<u8>>> = HashMap::new();
-            for key in keys.into_iter() {
-                let svr_idx = self.find_server_index_by_key(key.as_slice());
-
-                match svrkey.entry(svr_idx) {
-                    Entry::Occupied(entry) => {
-                        entry.into_mut().push(key);
-                    },
-                    Entry::Vacant(entry) => {
-                        entry.insert(vec![key]);
-                    }
-                }
-            }
-            svrkey
-        };
-
-        let mut chans = Vec::new();
-        for (svr_idx, v) in sk.into_iter() {
-            let (tx2, rx2) = channel();
-            let mut svr = self.servers[svr_idx].clone();
-            Thread::spawn(move || {
-                let r = svr.proto.get_multi(v);
-                tx2.send(r).unwrap();
-                drop(tx2);
-            });
-            chans.push(rx2);
-        }
-
-        let mut chan_iter = chans.into_iter();
-        let mut result = match chan_iter.next() {
-            Some(chan) => chan.recv().unwrap(),
-            None => return Ok(TreeMap::new()),
-        };
-        for rx in chan_iter {
-            let r = rx.recv().unwrap();
-            match r {
-                Ok(m) => {
-                    result = match result {
-                        Ok(mut rm) => {
-                            for (key, val) in m.into_iter() {
-                                rm.insert(key, val);
-                            }
-                            Ok(rm)
-                        },
-                        Err(err) => {
-                            Err(err)
-                        }
-                    };
-                },
-                Err(..) => {}
-            }
-        }
-
-        result
     }
 }
 
