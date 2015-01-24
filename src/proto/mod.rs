@@ -21,7 +21,7 @@
 
 //! Memcached protocol
 
-use std::fmt::{Show, Formatter, self};
+use std::fmt::{Display, Formatter, self};
 use collect::TreeMap;
 use std::io;
 
@@ -38,7 +38,7 @@ pub enum ProtoType {
     Binary,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ErrorKind {
     BinaryProtoError(binarydef::Status),
     IoError(io::IoErrorKind),
@@ -47,7 +47,7 @@ pub enum ErrorKind {
 
 pub type MemCachedResult<T> = Result<T, Error>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Error {
     pub kind: ErrorKind,
     pub desc: &'static str,
@@ -64,7 +64,7 @@ impl Error {
     }
 }
 
-impl Show for Error {
+impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self.detail {
             Some(ref detail) => write!(f, "{}", detail),

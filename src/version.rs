@@ -21,13 +21,13 @@
 
 //! Memcached version
 
-use std::fmt::{Show, Formatter, self};
+use std::fmt::{Display, Formatter, self};
 use std::str::FromStr;
 
 /// Memcached version
 ///
 /// Version(major, minor, patch)
-#[derive(Copy)]
+#[derive(Copy, Debug)]
 pub struct Version(u32, u32, u32);
 
 impl Version {
@@ -36,7 +36,7 @@ impl Version {
     }
 }
 
-impl Show for Version {
+impl Display for Version {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let &Version(major, minor, patch) = self;
         write!(f, "{}:{}:{}", major, minor, patch)
