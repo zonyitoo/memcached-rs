@@ -24,15 +24,10 @@
 use std::io::net::tcp::TcpStream;
 use std::io::net::pipe::UnixStream;
 use std::io::{IoResult, IoError, OtherIoError};
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
-use std::thread::Thread;
-use std::sync::mpsc::channel;
-use std::collections::BTreeMap;
 
 use crc32::Crc32;
 
-use proto::{Proto, Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation};
+use proto::{Proto, Operation, ServerOperation, NoReplyOperation, CasOperation};
 use proto::{MemCachedResult, self};
 
 #[derive(Clone)]
@@ -112,14 +107,14 @@ impl Client {
     ///
     /// `(address, weight)`.
     pub fn connect(svrs: &[(AddrType, usize)], p: proto::ProtoType) -> IoResult<Client> {
-        if svrs.len() == 0 {
+        if svrs.is_empty() {
             return Err(IoError {
                 kind: OtherIoError,
                 desc: "Empty server list",
                 detail: None,
             })
         }
-        let mut servers = Vec::new();
+        let mut servers = Vec::with_capacity(svrs.len());
         let mut bucket = Vec::new();
         for &(ref addr, ref weight) in svrs.iter() {
             servers.push(box try!(Server::connect(addr.clone(), p)));

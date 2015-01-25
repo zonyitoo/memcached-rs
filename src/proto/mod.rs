@@ -66,9 +66,10 @@ impl Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        try!(write!(f, "{}", self.desc));
         match self.detail {
-            Some(ref detail) => write!(f, "{}", detail),
-            None => write!(f, "{}", self.desc),
+            Some(ref detail) => write!(f, " ({})", detail),
+            None => Ok(())
         }
     }
 }
