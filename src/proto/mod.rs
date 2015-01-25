@@ -24,6 +24,7 @@
 use std::fmt::{Display, Formatter, self};
 use std::collections::BTreeMap;
 use std::io;
+use std::error;
 
 use version;
 
@@ -61,6 +62,12 @@ impl Error {
             desc: desc,
             detail: detail,
         }
+    }
+}
+
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        self.desc
     }
 }
 
@@ -130,4 +137,17 @@ pub trait NoReplyOperation {
     fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()>;
     fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()>;
     fn prepend_noreply(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()>;
+}
+
+#[derive(Debug)]
+pub enum AuthResponse {
+    Continue(Vec<u8>),
+    Succeeded,
+    Failed,
+}
+
+pub trait AuthOperation {
+    fn list_mechanisms(&mut self) -> MemCachedResult<Vec<String>>;
+    fn auth_start(&mut self, mech: &str, init: &[u8]) -> MemCachedResult<AuthResponse>;
+    fn auth_continue(&mut self, mech: &str, data: &[u8]) -> MemCachedResult<AuthResponse>;
 }

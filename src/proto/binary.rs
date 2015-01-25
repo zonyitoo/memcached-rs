@@ -25,8 +25,8 @@ use std::str;
 use std::rand::random;
 use std::collections::BTreeMap;
 
-use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation};
-use proto::{Error, ErrorKind, Proto};
+use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation, AuthOperation};
+use proto::{self, MemCachedResult, Error, ErrorKind, Proto, AuthResponse};
 use proto::binarydef::{RequestHeader, RequestPacket, RequestPacketRef, ResponsePacket, Command, DataType};
 use version::Version;
 
@@ -1063,11 +1063,83 @@ impl<T: Reader + Writer + Clone + Send> CasOperation for BinaryProto<T> {
     }
 }
 
+impl<T: Reader + Writer + Clone + Send> AuthOperation for BinaryProto<T> {
+    fn list_mechanisms(&mut self) -> MemCachedResult<Vec<String>> {
+        let opaque = random::<u32>();
+        let req_header = RequestHeader::new(Command::SaslListMechanisms, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
+        let req_packet = RequestPacketRef::new(&req_header, &[], &[], &[]);
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let mut resp_packet = try_io!(ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(ResponsePacket::read_from(&mut self.stream));
+        }
+        let resp = try_response!(resp_packet);
+
+        match str::from_utf8(&resp.value[]) {
+            Ok(s) => {
+                Ok(s.split(' ').map(|mech| mech.to_string()).collect())
+            },
+            Err(..) => {
+                Err(proto::Error::new(ErrorKind::OtherError, "Mechanism decode error", None))
+            }
+        }
+    }
+
+    fn auth_start(&mut self, mech: &str, init: &[u8]) -> MemCachedResult<AuthResponse> {
+        let opaque = random::<u32>();
+        let req_header = RequestHeader::from_payload(Command::SaslAuthenticate, DataType::RawBytes, 0, opaque, 0,
+                                                     mech.as_bytes(), &[], init);
+        let req_packet = RequestPacketRef::new(&req_header, &[], mech.as_bytes(), init);
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let mut resp_packet = try_io!(ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(ResponsePacket::read_from(&mut self.stream));
+        }
+
+        match resp_packet.header.status {
+            Status::AuthenticationFurtherStepRequired => Ok(AuthResponse::Continue(resp_packet.value)),
+            Status::NoError => Ok(AuthResponse::Succeeded),
+            Status::AuthenticationRequired => Ok(AuthResponse::Failed),
+            _ => Err(Error::new(ErrorKind::BinaryProtoError(resp_packet.header.status),
+                                                            resp_packet.header.status.desc(),
+                                                            None)),
+        }
+    }
+
+    fn auth_continue(&mut self, mech: &str, data: &[u8]) -> MemCachedResult<AuthResponse> {
+        let opaque = random::<u32>();
+        let req_header = RequestHeader::from_payload(Command::SaslStep, DataType::RawBytes, 0, opaque, 0,
+                                                     mech.as_bytes(), &[], data);
+        let req_packet = RequestPacketRef::new(&req_header, &[], mech.as_bytes(), data);
+        try_io!(req_packet.write_to(&mut self.stream));
+        try_io!(self.stream.flush());
+
+        let mut resp_packet = try_io!(ResponsePacket::read_from(&mut self.stream));
+        while resp_packet.header.opaque != opaque {
+            resp_packet = try_io!(ResponsePacket::read_from(&mut self.stream));
+        }
+
+        match resp_packet.header.status {
+            Status::AuthenticationFurtherStepRequired => Ok(AuthResponse::Continue(resp_packet.value)),
+            Status::NoError => Ok(AuthResponse::Succeeded),
+            Status::AuthenticationRequired => Ok(AuthResponse::Failed),
+            _ => Err(Error::new(ErrorKind::BinaryProtoError(resp_packet.header.status),
+                                                            resp_packet.header.status.desc(),
+                                                            None)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::io::net::tcp::TcpStream;
     use std::collections::BTreeMap;
-    use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation, BinaryProto};
+    use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation,
+                CasOperation, BinaryProto};
 
     const SERVER_ADDR: &'static str = "127.0.0.1:11211";
 

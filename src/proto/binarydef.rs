@@ -70,6 +70,8 @@ const STATUS_NOT_SUPPORTED: u16 = 0x0083;
 const STATUS_INTERNAL_ERROR: u16 = 0x0084;
 const STATUS_BUSY: u16 = 0x0085;
 const STATUS_TEMPORARY_FAILURE: u16 = 0x0086;
+const STATUS_AUTHENTICATION_REQUIRED: u16 = 0x0020;
+const STATUS_AUTHENTICATION_FURTHER_STEP_REQUIRED: u16 = 0x0021;
 
 const OPCODE_GET: u8 = 0x00;
 const OPCODE_SET: u8 = 0x01;
@@ -151,6 +153,8 @@ pub enum Status {
     InternalError,
     Busy,
     TemporaryFailure,
+    AuthenticationRequired,
+    AuthenticationFurtherStepRequired,
 }
 
 impl Status {
@@ -173,6 +177,8 @@ impl Status {
             Status::InternalError => STATUS_INTERNAL_ERROR,
             Status::Busy => STATUS_BUSY,
             Status::TemporaryFailure => STATUS_TEMPORARY_FAILURE,
+            Status::AuthenticationRequired => STATUS_AUTHENTICATION_REQUIRED,
+            Status::AuthenticationFurtherStepRequired => STATUS_AUTHENTICATION_FURTHER_STEP_REQUIRED,
         }
     }
 
@@ -195,6 +201,8 @@ impl Status {
             STATUS_INTERNAL_ERROR => Some(Status::InternalError),
             STATUS_BUSY => Some(Status::Busy),
             STATUS_TEMPORARY_FAILURE => Some(Status::TemporaryFailure),
+            STATUS_AUTHENTICATION_REQUIRED => Some(Status::AuthenticationRequired),
+            STATUS_AUTHENTICATION_FURTHER_STEP_REQUIRED => Some(Status::AuthenticationFurtherStepRequired),
             _ => None
         }
     }
@@ -218,6 +226,8 @@ impl Status {
             Status::InternalError => "internal error",
             Status::Busy => "busy",
             Status::TemporaryFailure => "temporary failure",
+            Status::AuthenticationRequired => "authentication required/not successful",
+            Status::AuthenticationFurtherStepRequired => "further authentication steps required",
         }
     }
 }

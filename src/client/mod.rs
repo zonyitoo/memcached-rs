@@ -111,10 +111,10 @@ impl Client {
         }
         let mut servers = Vec::with_capacity(svrs.len());
         let mut bucket = Vec::new();
-        for &(ref addr, ref weight) in svrs.iter() {
-            servers.push(box try!(Server::connect(addr.clone(), p)));
+        for &(addr, weight) in svrs.iter() {
+            servers.push(box try!(Server::connect(addr, p)));
 
-            for _ in range(0, *weight) {
+            for _ in range(0, weight) {
                 bucket.push(servers.len() - 1);
             }
         }
