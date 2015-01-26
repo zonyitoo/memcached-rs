@@ -54,9 +54,20 @@ macro_rules! try_option(
 
 impl FromStr for Version {
     fn from_str(s: &str) -> Option<Version> {
-        let sp: Vec<&str> = s.split('.').collect();
-        Some(Version::new(try_option!(sp[0].parse::<u32>()),
-                          try_option!(sp[1].parse::<u32>()),
-                          try_option!(sp[2].parse::<u32>())))
+        let mut sp = s.split('.');
+        let major = match sp.next() {
+            Some(s) => try_option!(s.parse()),
+            None => return None,
+        };
+        let minor = match sp.next() {
+            Some(s) => try_option!(s.parse()),
+            None => 0,
+        };
+        let patch = match sp.next() {
+            Some(s) => try_option!(s.parse()),
+            None => 0,
+        };
+
+        Some(Version::new(major, minor, patch))
     }
 }
