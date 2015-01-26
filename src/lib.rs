@@ -25,8 +25,6 @@
 
 #![feature(box_syntax)]
 
-#![allow(unstable)]
-
 #[macro_use]
 extern crate log;
 extern crate crc32;

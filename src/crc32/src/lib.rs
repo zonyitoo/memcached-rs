@@ -11,9 +11,9 @@ impl Crc32 {
     pub fn new() -> Crc32 {
         let mut c = Crc32 { table: [0; 256], value: 0xffffffff };
 
-        for i in range(0u, 256) {
+        for i in range(0us, 256) {
             let mut v = i as u32;
-            for _ in range(0i, 8) {
+            for _ in range(0is, 8) {
                 v = if v & 1 != 0 {
                     CRC32_INITIAL ^ (v >> 1)
                 } else {
@@ -32,7 +32,7 @@ impl Crc32 {
 
     pub fn update(&mut self, buf: &[u8]) {
         for &i in buf.iter() {
-            self.value = self.table[((self.value ^ (i as u32)) & 0xFF) as uint] ^ (self.value >> 8);
+            self.value = self.table[((self.value ^ (i as u32)) & 0xFF) as usize] ^ (self.value >> 8);
         }
     }
 

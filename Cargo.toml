@@ -8,3 +8,4 @@ name = "memcached"
 
 [dependencies.crc32]
 path = "src/crc32"
+version = "0.1.0"
