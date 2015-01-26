@@ -136,53 +136,37 @@ const DATA_TYPE_RAW_BYTES: u8 = 0x00;
 
 /// Memcached response status
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u16)]
 pub enum Status {
-    NoError,
-    KeyNotFound,
-    KeyExists,
-    ValueTooLarge,
-    InvalidArguments,
-    ItemNotStored,
-    IncrDecrOnNonNumericValue,
-    VBucketBelongsToOtherServer,
-    AuthenticationError,
-    AuthenticationContinue,
-    UnknownCommand,
-    OutOfMemory,
-    NotSupported,
-    InternalError,
-    Busy,
-    TemporaryFailure,
-    AuthenticationRequired,
-    AuthenticationFurtherStepRequired,
+    NoError                             = STATUS_NO_ERROR,
+    KeyNotFound                         = STATUS_KEY_NOT_FOUND,
+    KeyExists                           = STATUS_KEY_EXISTS,
+    ValueTooLarge                       = STATUS_VALUE_TOO_LARGE,
+    InvalidArguments                    = STATUS_INVALID_ARGUMENTS,
+    ItemNotStored                       = STATUS_ITEM_NOT_STORED,
+    IncrDecrOnNonNumericValue           = STATUS_INCR_OR_DECR_ON_NON_NUMERIC_VALUE,
+    VBucketBelongsToOtherServer         = STATUS_VBUCKET_BELONGS_TO_OTHER_SERVER,
+    AuthenticationError                 = STATUS_AUTHENTICATION_ERROR,
+    AuthenticationContinue              = STATUS_AUTHENTICATION_CONTINUE,
+    UnknownCommand                      = STATUS_UNKNOWN_COMMAND,
+    OutOfMemory                         = STATUS_OUT_OF_MEMORY,
+    NotSupported                        = STATUS_NOT_SUPPORTED,
+    InternalError                       = STATUS_INTERNAL_ERROR,
+    Busy                                = STATUS_BUSY,
+    TemporaryFailure                    = STATUS_TEMPORARY_FAILURE,
+    AuthenticationRequired              = STATUS_AUTHENTICATION_REQUIRED,
+    AuthenticationFurtherStepRequired   = STATUS_AUTHENTICATION_FURTHER_STEP_REQUIRED,
 }
 
 impl Status {
     /// Get the binary code of the status
+    #[inline]
     pub fn code(&self) -> u16 {
-        match *self {
-            Status::NoError => STATUS_NO_ERROR,
-            Status::KeyNotFound => STATUS_KEY_NOT_FOUND,
-            Status::KeyExists => STATUS_KEY_EXISTS,
-            Status::ValueTooLarge => STATUS_VALUE_TOO_LARGE,
-            Status::InvalidArguments => STATUS_INVALID_ARGUMENTS,
-            Status::ItemNotStored => STATUS_ITEM_NOT_STORED,
-            Status::IncrDecrOnNonNumericValue => STATUS_INCR_OR_DECR_ON_NON_NUMERIC_VALUE,
-            Status::VBucketBelongsToOtherServer => STATUS_VBUCKET_BELONGS_TO_OTHER_SERVER,
-            Status::AuthenticationError => STATUS_AUTHENTICATION_ERROR,
-            Status::AuthenticationContinue => STATUS_AUTHENTICATION_CONTINUE,
-            Status::UnknownCommand => STATUS_UNKNOWN_COMMAND,
-            Status::OutOfMemory => STATUS_OUT_OF_MEMORY,
-            Status::NotSupported => STATUS_NOT_SUPPORTED,
-            Status::InternalError => STATUS_INTERNAL_ERROR,
-            Status::Busy => STATUS_BUSY,
-            Status::TemporaryFailure => STATUS_TEMPORARY_FAILURE,
-            Status::AuthenticationRequired => STATUS_AUTHENTICATION_REQUIRED,
-            Status::AuthenticationFurtherStepRequired => STATUS_AUTHENTICATION_FURTHER_STEP_REQUIRED,
-        }
+        *self as u16
     }
 
     /// Generate a Status from binary code
+    #[inline]
     pub fn from_code(code: u16) -> Option<Status> {
         match code {
             STATUS_NO_ERROR => Some(Status::NoError),
@@ -208,6 +192,7 @@ impl Status {
     }
 
     /// Get a short description
+    #[inline]
     pub fn desc(&self) -> &'static str {
         match *self {
             Status::NoError => "no error",
@@ -232,132 +217,76 @@ impl Status {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u8)]
 pub enum Command {
-    Get,
-    Set,
-    Add,
-    Replace,
-    Delete,
-    Increment,
-    Decrement,
-    Quit,
-    Flush,
-    GetQuietly,
-    Noop,
-    Version,
-    GetKey,
-    GetKeyQuietly,
-    Append,
-    Prepend,
-    Stat,
-    SetQuietly,
-    AddQuietly,
-    ReplaceQuietly,
-    DeleteQuietly,
-    IncrementQuietly,
-    DecrementQuietly,
-    QuitQuietly,
-    FlushQuietly,
-    AppendQuietly,
-    PrependQuietly,
-    Verbosity,
-    Touch,
-    GetAndTouch,
-    GetAndTouchQuietly,
-    SaslListMechanisms,
-    SaslAuthenticate,
-    SaslStep,
-    RGet,
-    RSet,
-    RSetQuietly,
-    RAppend,
-    RAppendQuietly,
-    RPrepend,
-    RPrependQuietly,
-    RDelete,
-    RDeleteQuietly,
-    RIncrement,
-    RIncrementQuietly,
-    RDecrement,
-    RDecrementQuietly,
-    SetVBucket,
-    GetVBucket,
-    DelVBucket,
-    TapConnect,
-    TapMutation,
-    TapDelete,
-    TapFlush,
-    TapOpaque,
-    TapVBucketSet,
-    TapCheckpointStart,
-    TapCheckpointEnd,
+    Get                 = OPCODE_GET,
+    Set                 = OPCODE_SET,
+    Add                 = OPCODE_ADD,
+    Replace             = OPCODE_REPLACE,
+    Delete              = OPCODE_DEL,
+    Increment           = OPCODE_INCR,
+    Decrement           = OPCODE_DECR,
+    Quit                = OPCODE_QUIT,
+    Flush               = OPCODE_FLUSH,
+    GetQuietly          = OPCODE_GETQ,
+    Noop                = OPCODE_NOP,
+    Version             = OPCODE_VERSION,
+    GetKey              = OPCODE_GETK,
+    GetKeyQuietly       = OPCODE_GETKQ,
+    Append              = OPCODE_APPEND,
+    Prepend             = OPCODE_PREPEND,
+    Stat                = OPCODE_STAT,
+    SetQuietly          = OPCODE_SETQ,
+    AddQuietly          = OPCODE_ADDQ,
+    ReplaceQuietly      = OPCODE_REPLACEQ,
+    DeleteQuietly       = OPCODE_DELQ,
+    IncrementQuietly    = OPCODE_INCRQ,
+    DecrementQuietly    = OPCODE_DECRQ,
+    QuitQuietly         = OPCODE_QUITQ,
+    FlushQuietly        = OPCODE_FLUSHQ,
+    AppendQuietly       = OPCODE_APPENDQ,
+    PrependQuietly      = OPCODE_PREPENDQ,
+    Verbosity           = OPCODE_VERBOSITY,
+    Touch               = OPCODE_TOUCH,
+    GetAndTouch         = OPCODE_GAT,
+    GetAndTouchQuietly  = OPCODE_GATQ,
+    SaslListMechanisms  = OPCODE_SASL_LIST_MECHS,
+    SaslAuthenticate    = OPCODE_SASL_AUTH,
+    SaslStep            = OPCODE_SASL_STEP,
+    RGet                = OPCODE_RGET,
+    RSet                = OPCODE_RSET,
+    RSetQuietly         = OPCODE_RSETQ,
+    RAppend             = OPCODE_RAPPEND,
+    RAppendQuietly      = OPCODE_RAPPENDQ,
+    RPrepend            = OPCODE_RPREPEND,
+    RPrependQuietly     = OPCODE_RPREPENDQ,
+    RDelete             = OPCODE_RDEL,
+    RDeleteQuietly      = OPCODE_RDELQ,
+    RIncrement          = OPCODE_RINCR,
+    RIncrementQuietly   = OPCODE_RINCRQ,
+    RDecrement          = OPCODE_RDECR,
+    RDecrementQuietly   = OPCODE_RDECRQ,
+    SetVBucket          = OPCODE_SET_VBUCKET,
+    GetVBucket          = OPCODE_GET_VBUCKET,
+    DelVBucket          = OPCODE_DEL_VBUCKET,
+    TapConnect          = OPCODE_TAP_CONNECT,
+    TapMutation         = OPCODE_TAP_MUTATION,
+    TapDelete           = OPCODE_TAP_DEL,
+    TapFlush            = OPCODE_TAP_FLUSH,
+    TapOpaque           = OPCODE_TAP_OPAQUE,
+    TapVBucketSet       = OPCODE_TAP_VBUCKET_SET,
+    TapCheckpointStart  = OPCODE_TAP_CHECKPOINT_START,
+    TapCheckpointEnd    = OPCODE_TAP_CHECKPOINT_END,
 }
 
 impl Command {
+    #[inline]
     fn code(&self) -> u8 {
-        match *self {
-            Command::Get => OPCODE_GET,
-            Command::Set => OPCODE_SET,
-            Command::Add => OPCODE_ADD,
-            Command::Replace => OPCODE_REPLACE,
-            Command::Delete => OPCODE_DEL,
-            Command::Increment => OPCODE_INCR,
-            Command::Decrement => OPCODE_DECR,
-            Command::Quit => OPCODE_QUIT,
-            Command::Flush => OPCODE_FLUSH,
-            Command::GetQuietly => OPCODE_GETQ,
-            Command::Noop => OPCODE_NOP,
-            Command::Version => OPCODE_VERSION,
-            Command::GetKey => OPCODE_GETK,
-            Command::GetKeyQuietly => OPCODE_GETKQ,
-            Command::Append => OPCODE_APPEND,
-            Command::Prepend => OPCODE_PREPEND,
-            Command::Stat => OPCODE_STAT,
-            Command::SetQuietly => OPCODE_SETQ,
-            Command::AddQuietly => OPCODE_ADDQ,
-            Command::ReplaceQuietly => OPCODE_REPLACEQ,
-            Command::DeleteQuietly => OPCODE_DELQ,
-            Command::IncrementQuietly => OPCODE_INCRQ,
-            Command::DecrementQuietly => OPCODE_DECRQ,
-            Command::QuitQuietly => OPCODE_QUITQ,
-            Command::FlushQuietly => OPCODE_FLUSHQ,
-            Command::AppendQuietly => OPCODE_APPENDQ,
-            Command::PrependQuietly => OPCODE_PREPENDQ,
-            Command::Verbosity => OPCODE_VERBOSITY,
-            Command::Touch => OPCODE_TOUCH,
-            Command::GetAndTouch => OPCODE_GAT,
-            Command::GetAndTouchQuietly => OPCODE_GATQ,
-            Command::SaslListMechanisms => OPCODE_SASL_LIST_MECHS,
-            Command::SaslAuthenticate => OPCODE_SASL_AUTH,
-            Command::SaslStep => OPCODE_SASL_STEP,
-            Command::RGet => OPCODE_RGET,
-            Command::RSet => OPCODE_RSET,
-            Command::RSetQuietly => OPCODE_RSETQ,
-            Command::RAppend => OPCODE_RAPPEND,
-            Command::RAppendQuietly => OPCODE_RAPPENDQ,
-            Command::RPrepend => OPCODE_RPREPEND,
-            Command::RPrependQuietly => OPCODE_RPREPENDQ,
-            Command::RDelete => OPCODE_RDEL,
-            Command::RDeleteQuietly => OPCODE_RDELQ,
-            Command::RIncrement => OPCODE_RINCR,
-            Command::RIncrementQuietly => OPCODE_RINCRQ,
-            Command::RDecrement => OPCODE_RDECR,
-            Command::RDecrementQuietly => OPCODE_RDECRQ,
-            Command::SetVBucket => OPCODE_SET_VBUCKET,
-            Command::GetVBucket => OPCODE_GET_VBUCKET,
-            Command::DelVBucket => OPCODE_DEL_VBUCKET,
-            Command::TapConnect => OPCODE_TAP_CONNECT,
-            Command::TapMutation => OPCODE_TAP_MUTATION,
-            Command::TapDelete => OPCODE_TAP_DEL,
-            Command::TapFlush => OPCODE_TAP_FLUSH,
-            Command::TapOpaque => OPCODE_TAP_OPAQUE,
-            Command::TapVBucketSet => OPCODE_TAP_VBUCKET_SET,
-            Command::TapCheckpointStart => OPCODE_TAP_CHECKPOINT_START,
-            Command::TapCheckpointEnd => OPCODE_TAP_CHECKPOINT_END,
-        }
+        *self as u8
     }
 
+    #[inline]
     fn from_code(code: u8) -> Option<Command> {
         match code {
             OPCODE_GET => Some(Command::Get),
@@ -423,18 +352,20 @@ impl Command {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum DataType {
     RawBytes,
 }
 
 impl DataType {
+    #[inline]
     fn code(&self) -> u8 {
         match *self {
             DataType::RawBytes => DATA_TYPE_RAW_BYTES,
         }
     }
 
+    #[inline]
     fn from_code(code: u8) -> Option<DataType> {
         match code {
             DATA_TYPE_RAW_BYTES => Some(DataType::RawBytes),
@@ -495,6 +426,7 @@ impl RequestHeader {
         RequestHeader::new(cmd, dtype, vbid, opaque, cas, key_len, extra_len, body_len)
     }
 
+    #[inline]
     pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
         try!(writer.write_u8(MAGIC_REQUEST));
         try!(writer.write_u8(self.command.code()));
@@ -509,6 +441,7 @@ impl RequestHeader {
         Ok(())
     }
 
+    #[inline]
     pub fn read_from(reader: &mut Reader) -> IoResult<RequestHeader> {
         let magic = try!(reader.read_u8());
 
@@ -587,6 +520,7 @@ impl ResponseHeader {
         ResponseHeader::new(cmd, dtype, status, opaque, cas, key_len, extra_len, body_len)
     }
 
+    #[inline]
     pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
         try!(writer.write_u8(MAGIC_RESPONSE));
         try!(writer.write_u8(self.command.code()));
@@ -601,6 +535,7 @@ impl ResponseHeader {
         Ok(())
     }
 
+    #[inline]
     pub fn read_from(reader: &mut Reader) -> IoResult<ResponseHeader> {
         let magic = try!(reader.read_u8());
 
@@ -650,6 +585,7 @@ impl RequestPacket {
         }
     }
 
+    #[inline]
     pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
         try!(self.header.write_to(writer));
         try!(writer.write(&self.extra[]));
@@ -659,6 +595,7 @@ impl RequestPacket {
         Ok(())
     }
 
+    #[inline]
     pub fn read_from(reader: &mut Reader) -> IoResult<RequestPacket> {
         let header = try!(RequestHeader::read_from(reader));
 
@@ -697,6 +634,7 @@ impl<'a> RequestPacketRef<'a> {
         }
     }
 
+    #[inline]
     pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
         try!(self.header.write_to(writer));
         try!(writer.write(self.extra));
@@ -727,6 +665,7 @@ impl ResponsePacket {
         }
     }
 
+    #[inline]
     pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
         try!(self.header.write_to(writer));
         try!(writer.write(&self.extra[]));
@@ -736,6 +675,7 @@ impl ResponsePacket {
         Ok(())
     }
 
+    #[inline]
     pub fn read_from(reader: &mut Reader) -> IoResult<ResponsePacket> {
         let header = try!(ResponseHeader::read_from(reader));
 
@@ -769,6 +709,7 @@ impl<'a> ResponsePacketRef<'a> {
         }
     }
 
+    #[inline]
     pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
         try!(self.header.write_to(writer));
         try!(writer.write(self.extra));
