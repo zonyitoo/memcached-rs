@@ -24,11 +24,12 @@
 use std::io::net::tcp::TcpStream;
 use std::io::net::pipe::UnixStream;
 use std::io::{IoResult, IoError, OtherIoError};
-
-use crc32::Crc32;
+use std::u32;
 
 use proto::{Proto, Operation, ServerOperation, NoReplyOperation, CasOperation};
 use proto::{MemCachedResult, self};
+
+use crc32::crc32;
 
 struct Server {
     pub proto: Box<Proto + Send>,
@@ -90,7 +91,6 @@ impl Clone for Server {
 /// ```
 pub struct Client {
     servers: Vec<Box<Server>>,
-    key_hasher: Crc32,
     bucket: Vec<usize>,
 }
 
@@ -120,13 +120,12 @@ impl Client {
         }
         Ok(Client {
             servers: servers,
-            key_hasher: Crc32::new(),
             bucket: bucket,
         })
     }
 
     fn find_server_index_by_key(&mut self, key: &[u8]) -> usize {
-        let hash = (self.key_hasher.crc(key) >> 16) & 0x7fff;
+        let hash = (crc32(u32::MAX, key) >> 16) & 0x7fff;
         self.bucket[(hash as usize) % self.bucket.len()]
     }
 

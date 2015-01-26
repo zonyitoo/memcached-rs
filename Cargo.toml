@@ -2,10 +2,13 @@
 name = "memcached-rs"
 version = "0.0.1"
 authors = ["Y. T. CHUNG <zonyitoo@gmail.com>"]
+description = "A MemCached Library in Rust"
+repository = "https://github.com/zonyitoo/memcached-rs"
+keywords = ["memcached"]
+license = "MIT"
 
 [lib]
 name = "memcached"
 
 [dependencies.crc32]
-path = "src/crc32"
-version = "0.1.0"
+crc32 = "*"
