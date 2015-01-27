@@ -114,7 +114,7 @@ impl Client {
         for &(addr, weight) in svrs.iter() {
             servers.push(box try!(Server::connect(addr, p)));
 
-            for _ in range(0, weight) {
+            for _ in (0..weight) {
                 bucket.push(servers.len() - 1);
             }
         }
@@ -304,7 +304,7 @@ mod test {
     use std::rand::random;
 
     fn generate_data(len: usize) -> Vec<u8> {
-        range(0, len).map(|_| random()).collect()
+        (0..len).map(|_| random()).collect()
     }
 
     #[bench]
