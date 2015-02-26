@@ -49,7 +49,9 @@
 
 #![allow(dead_code)]
 
-use std::io::{Writer, Reader, IoResult, IoError, OtherIoError};
+use std::io::{self, Write, Read, ReadExt};
+
+use byteorder::{ReadBytesExt, WriteBytesExt, BigEndian};
 
 const MAGIC_REQUEST: u8 = 0x80;
 const MAGIC_RESPONSE: u8 = 0x81;
@@ -427,43 +429,43 @@ impl RequestHeader {
     }
 
     #[inline]
-    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         try!(writer.write_u8(MAGIC_REQUEST));
         try!(writer.write_u8(self.command.code()));
-        try!(writer.write_be_u16(self.key_len));
+        try!(writer.write_u16::<BigEndian>(self.key_len));
         try!(writer.write_u8(self.extra_len));
         try!(writer.write_u8(self.data_type.code()));
-        try!(writer.write_be_u16(self.vbucket_id));
-        try!(writer.write_be_u32(self.body_len));
-        try!(writer.write_be_u32(self.opaque));
-        try!(writer.write_be_u64(self.cas));
+        try!(writer.write_u16::<BigEndian>(self.vbucket_id));
+        try!(writer.write_u32::<BigEndian>(self.body_len));
+        try!(writer.write_u32::<BigEndian>(self.opaque));
+        try!(writer.write_u64::<BigEndian>(self.cas));
 
         Ok(())
     }
 
     #[inline]
-    pub fn read_from(reader: &mut Reader) -> IoResult<RequestHeader> {
+    pub fn read_from<R: ReadExt>(reader: &mut R) -> io::Result<RequestHeader> {
         let magic = try!(reader.read_u8());
 
         if magic != MAGIC_REQUEST {
-            return Err(make_io_error("Invalid magic", None));
+            return Err(io::Error::new(io::ErrorKind::Other, "Invalid magic", None));
         }
 
         Ok(RequestHeader {
             command: match Command::from_code(try!(reader.read_u8())) {
                 Some(c) => c,
-                None => return Err(make_io_error("Invalid command", None)),
+                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid command", None)),
             },
-            key_len: try!(reader.read_be_u16()),
+            key_len: try!(reader.read_u16::<BigEndian>()),
             extra_len: try!(reader.read_u8()),
             data_type: match DataType::from_code(try!(reader.read_u8())) {
                 Some(d) => d,
-                None => return Err(make_io_error("Invalid data type", None))
+                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid data type", None))
             },
-            vbucket_id: try!(reader.read_be_u16()),
-            body_len: try!(reader.read_be_u32()),
-            opaque: try!(reader.read_be_u32()),
-            cas: try!(reader.read_be_u64()),
+            vbucket_id: try!(reader.read_u16::<BigEndian>()),
+            body_len: try!(reader.read_u32::<BigEndian>()),
+            opaque: try!(reader.read_u32::<BigEndian>()),
+            cas: try!(reader.read_u64::<BigEndian>()),
         })
     }
 }
@@ -521,46 +523,46 @@ impl ResponseHeader {
     }
 
     #[inline]
-    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         try!(writer.write_u8(MAGIC_RESPONSE));
         try!(writer.write_u8(self.command.code()));
-        try!(writer.write_be_u16(self.key_len));
+        try!(writer.write_u16::<BigEndian>(self.key_len));
         try!(writer.write_u8(self.extra_len));
         try!(writer.write_u8(self.data_type.code()));
-        try!(writer.write_be_u16(self.status.code()));
-        try!(writer.write_be_u32(self.body_len));
-        try!(writer.write_be_u32(self.opaque));
-        try!(writer.write_be_u64(self.cas));
+        try!(writer.write_u16::<BigEndian>(self.status.code()));
+        try!(writer.write_u32::<BigEndian>(self.body_len));
+        try!(writer.write_u32::<BigEndian>(self.opaque));
+        try!(writer.write_u64::<BigEndian>(self.cas));
 
         Ok(())
     }
 
     #[inline]
-    pub fn read_from(reader: &mut Reader) -> IoResult<ResponseHeader> {
+    pub fn read_from<R: ReadExt>(reader: &mut R) -> io::Result<ResponseHeader> {
         let magic = try!(reader.read_u8());
 
         if magic != MAGIC_RESPONSE {
-            return Err(make_io_error("Invalid magic", None));
+            return Err(io::Error::new(io::ErrorKind::Other, "Invalid magic", None));
         }
 
         Ok(ResponseHeader {
             command: match Command::from_code(try!(reader.read_u8())) {
                 Some(c) => c,
-                None => return Err(make_io_error("Invalid command", None)),
+                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid command", None)),
             },
-            key_len: try!(reader.read_be_u16()),
+            key_len: try!(reader.read_u16::<BigEndian>()),
             extra_len: try!(reader.read_u8()),
             data_type: match DataType::from_code(try!(reader.read_u8())) {
                 Some(d) => d,
-                None => return Err(make_io_error("Invalid data type", None))
+                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid data type", None))
             },
-            status: match Status::from_code(try!(reader.read_be_u16())) {
+            status: match Status::from_code(try!(reader.read_u16::<BigEndian>())) {
                 Some(s) => s,
-                None => return Err(make_io_error("Invalid status", None)),
+                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid status", None)),
             },
-            body_len: try!(reader.read_be_u32()),
-            opaque: try!(reader.read_be_u32()),
-            cas: try!(reader.read_be_u64()),
+            body_len: try!(reader.read_u32::<BigEndian>()),
+            opaque: try!(reader.read_u32::<BigEndian>()),
+            cas: try!(reader.read_u64::<BigEndian>()),
         })
     }
 }
@@ -578,7 +580,7 @@ impl RequestPacket {
                extra: Vec<u8>, key: Vec<u8>, value: Vec<u8>) -> RequestPacket {
         RequestPacket {
             header: RequestHeader::from_payload(cmd, dtype, vbid, opaque, cas,
-                                                &key[], &extra[], &value[]),
+                                                &key[..], &extra[..], &value[..]),
             extra: extra,
             key: key,
             value: value,
@@ -586,33 +588,51 @@ impl RequestPacket {
     }
 
     #[inline]
-    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         try!(self.header.write_to(writer));
-        try!(writer.write(&self.extra[]));
-        try!(writer.write(&self.key[]));
-        try!(writer.write(&self.value[]));
+        try!(writer.write_all(&self.extra[..]));
+        try!(writer.write_all(&self.key[..]));
+        try!(writer.write_all(&self.value[..]));
 
         Ok(())
     }
 
     #[inline]
-    pub fn read_from(reader: &mut Reader) -> IoResult<RequestPacket> {
+    pub fn read_from<R: ReadExt>(reader: &mut R) -> io::Result<RequestPacket> {
         let header = try!(RequestHeader::read_from(reader));
 
         let extra_len = header.extra_len as usize;
         let key_len = header.key_len as usize;
         let value_len = header.body_len as usize - extra_len - key_len;
 
+        let extra = {
+            let mut buf = Vec::with_capacity(extra_len as usize);
+            try!(reader.take(extra_len as u64).read_to_end(&mut buf));
+            buf
+        };
+
+        let key = {
+            let mut buf = Vec::with_capacity(key_len as usize);
+            try!(reader.take(key_len as u64).read_to_end(&mut buf));
+            buf
+        };
+
+        let value = {
+            let mut buf = Vec::with_capacity(value_len as usize);
+            try!(reader.take(value_len as u64).read_to_end(&mut buf));
+            buf
+        };
+
         Ok(RequestPacket {
             header: header,
-            extra: try!(reader.read_exact(extra_len as usize)),
-            key: try!(reader.read_exact(key_len as usize)),
-            value: try!(reader.read_exact(value_len)),
+            extra: extra,
+            key: key,
+            value: value,
         })
     }
 
     pub fn as_ref<'a>(&'a self) -> RequestPacketRef<'a> {
-        RequestPacketRef::new(&self.header, &self.extra[], &self.key[], &self.value[])
+        RequestPacketRef::new(&self.header, &self.extra[..], &self.key[..], &self.value[..])
     }
 }
 
@@ -635,11 +655,11 @@ impl<'a> RequestPacketRef<'a> {
     }
 
     #[inline]
-    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         try!(self.header.write_to(writer));
-        try!(writer.write(self.extra));
-        try!(writer.write(self.key));
-        try!(writer.write(self.value));
+        try!(writer.write_all(self.extra));
+        try!(writer.write_all(self.key));
+        try!(writer.write_all(self.value));
 
         Ok(())
     }
@@ -658,7 +678,7 @@ impl ResponsePacket {
                extra: Vec<u8>, key: Vec<u8>, value: Vec<u8>) -> ResponsePacket {
         ResponsePacket {
             header: ResponseHeader::from_payload(cmd, dtype, status, opaque, cas,
-                                                 &key[], &extra[], &value[]),
+                                                 &key[..], &extra[..], &value[..]),
             extra: extra,
             key: key,
             value: value,
@@ -666,28 +686,46 @@ impl ResponsePacket {
     }
 
     #[inline]
-    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         try!(self.header.write_to(writer));
-        try!(writer.write(&self.extra[]));
-        try!(writer.write(&self.key[]));
-        try!(writer.write(&self.value[]));
+        try!(writer.write_all(&self.extra[..]));
+        try!(writer.write_all(&self.key[..]));
+        try!(writer.write_all(&self.value[..]));
 
         Ok(())
     }
 
     #[inline]
-    pub fn read_from(reader: &mut Reader) -> IoResult<ResponsePacket> {
+    pub fn read_from<R: ReadExt>(reader: &mut R) -> io::Result<ResponsePacket> {
         let header = try!(ResponseHeader::read_from(reader));
 
         let extra_len = header.extra_len as usize;
         let key_len = header.key_len as usize;
         let value_len = header.body_len as usize - extra_len - key_len;
 
+        let extra = {
+            let mut buf = Vec::with_capacity(extra_len as usize);
+            try!(reader.take(extra_len as u64).read_to_end(&mut buf));
+            buf
+        };
+
+        let key = {
+            let mut buf = Vec::with_capacity(key_len as usize);
+            try!(reader.take(key_len as u64).read_to_end(&mut buf));
+            buf
+        };
+
+        let value = {
+            let mut buf = Vec::with_capacity(value_len as usize);
+            try!(reader.take(value_len as u64).read_to_end(&mut buf));
+            buf
+        };
+
         Ok(ResponsePacket {
             header: header,
-            extra: try!(reader.read_exact(extra_len)),
-            key: try!(reader.read_exact(key_len)),
-            value: try!(reader.read_exact(value_len)),
+            extra: extra,
+            key: key,
+            value: value,
         })
     }
 }
@@ -710,28 +748,20 @@ impl<'a> ResponsePacketRef<'a> {
     }
 
     #[inline]
-    pub fn write_to(&self, writer: &mut Writer) -> IoResult<()> {
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         try!(self.header.write_to(writer));
-        try!(writer.write(self.extra));
-        try!(writer.write(self.key));
-        try!(writer.write(self.value));
+        try!(writer.write_all(self.extra));
+        try!(writer.write_all(self.key));
+        try!(writer.write_all(self.value));
 
         Ok(())
     }
 }
 
-fn make_io_error(desc: &'static str, detail: Option<String>) -> IoError {
-    IoError {
-        kind: OtherIoError,
-        desc: desc,
-        detail: detail,
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use std::io::net::tcp::TcpStream;
-    use std::io::BufferedStream;
+    use std::net::TcpStream;
+    use std::io::{BufStream, Write};
 
     use proto;
     use proto::binarydef::{RequestPacket, ResponsePacket, Command, DataType};
@@ -742,7 +772,7 @@ mod test {
 
     #[test]
     fn test_binary_protocol() {
-        let mut stream = BufferedStream::new(test_stream());
+        let mut stream = BufStream::new(test_stream());
 
         {
             let req_packet = RequestPacket::new(

@@ -26,7 +26,9 @@ use std::collections::BTreeMap;
 use std::io;
 use std::error;
 
-use version;
+use semver::Version;
+
+use byteorder;
 
 pub use self::binary::BinaryProto;
 
@@ -39,51 +41,67 @@ pub enum ProtoType {
     Binary,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum ErrorKind {
-    BinaryProtoError(binarydef::Status),
-    IoError(io::IoErrorKind),
-    OtherError,
+#[derive(Clone, Debug)]
+pub enum Error {
+    BinaryProtoError(binary::Error),
+    IoError(io::Error),
+    OtherError {
+        desc: &'static str,
+        detail: Option<String>
+    },
 }
 
 pub type MemCachedResult<T> = Result<T, Error>;
 
-#[derive(Clone, Debug)]
-pub struct Error {
-    pub kind: ErrorKind,
-    pub desc: &'static str,
-    pub detail: Option<String>,
-}
-
-impl Error {
-    pub fn new(kind: ErrorKind, desc: &'static str, detail: Option<String>) -> Error {
-        Error {
-            kind: kind,
-            desc: desc,
-            detail: detail,
-        }
-    }
-}
-
 impl error::Error for Error {
     fn description(&self) -> &str {
-        self.desc
+        match self {
+            &Error::BinaryProtoError(ref err) => err.description(),
+            &Error::IoError(ref err) => err.description(),
+            &Error::OtherError { desc, .. } => desc,
+        }
     }
 }
 
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        try!(write!(f, "{}", self.desc));
-        match self.detail {
-            Some(ref detail) => write!(f, " ({})", detail),
-            None => Ok(())
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Error::BinaryProtoError(ref err) => err.fmt(f),
+            &Error::IoError(ref err) => err.fmt(f),
+            &Error::OtherError { desc, ref detail } => {
+                try!(write!(f, "{}", desc));
+                match detail {
+                    &Some(ref s) => write!(f, " ({})", s),
+                    &None => Ok(())
+                }
+            }
         }
+    }
+}
+
+impl error::FromError<io::Error> for Error {
+    fn from_error(err: io::Error) -> Error {
+        Error::IoError(err)
+    }
+}
+
+impl error::FromError<binary::Error> for Error {
+    fn from_error(err: binary::Error) -> Error {
+        Error::BinaryProtoError(err)
+    }
+}
+
+impl error::FromError<byteorder::Error> for Error {
+    fn from_error(err: byteorder::Error) -> Error {
+        error::FromError::from_error(err)
     }
 }
 
 pub trait Proto: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation {
-    fn clone(&self) -> Box<Proto + Send>;
+    // fn clone(&self) -> Box<Proto + Send>;
 }
+
+impl<T> Proto for T where T: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation {}
 
 pub trait Operation {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()>;
@@ -118,7 +136,7 @@ pub trait ServerOperation {
     fn quit(&mut self) -> MemCachedResult<()>;
     fn flush(&mut self, expiration: u32) -> MemCachedResult<()>;
     fn noop(&mut self) -> MemCachedResult<()>;
-    fn version(&mut self) -> MemCachedResult<version::Version>;
+    fn version(&mut self) -> MemCachedResult<Version>;
     fn stat(&mut self) -> MemCachedResult<BTreeMap<String, String>>;
 }
 

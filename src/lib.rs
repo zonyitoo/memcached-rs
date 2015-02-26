@@ -19,17 +19,17 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#![experimental]
 #![crate_type = "lib"]
 #![crate_name = "memcached"]
 
-#![feature(box_syntax)]
+#![feature(box_syntax, io, net, core, test)]
 
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 extern crate crc32;
 extern crate test;
+extern crate byteorder;
+extern crate semver;
+extern crate rand;
 
 pub mod proto;
-pub mod version;
 pub mod client;

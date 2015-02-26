@@ -21,9 +21,8 @@
 
 //! Memcached client
 
-use std::io::net::tcp::TcpStream;
-use std::io::net::pipe::UnixStream;
-use std::io::{IoResult, IoError, OtherIoError};
+use std::net::TcpStream;
+use std::io;
 use std::u32;
 
 use proto::{Proto, Operation, ServerOperation, NoReplyOperation, CasOperation};
@@ -36,8 +35,8 @@ struct Server {
 }
 
 impl Server {
-    fn connect(addr: &str, protocol: proto::ProtoType) -> IoResult<Server> {
-        let mut split = addr.split_str("://");
+    fn connect(addr: &str, protocol: proto::ProtoType) -> io::Result<Server> {
+        let mut split = addr.split("://");
 
         Ok(Server {
             proto: match protocol {
@@ -47,10 +46,10 @@ impl Server {
                             let stream = try!(TcpStream::connect(addr));
                             box proto::BinaryProto::new(stream) as Box<Proto + Send>
                         },
-                        (Some("unix"), Some(addr)) => {
-                            let stream = try!(UnixStream::connect(&Path::new(addr)));
-                            box proto::BinaryProto::new(stream) as Box<Proto + Send>
-                        },
+                        // (Some("unix"), Some(addr)) => {
+                        //     let stream = try!(UnixStream::connect(&Path::new(addr)));
+                        //     box proto::BinaryProto::new(stream) as Box<Proto + Send>
+                        // },
                         (Some(prot), _) => {
                             panic!("Unsupported protocol: {}", prot);
                         },
@@ -62,11 +61,11 @@ impl Server {
     }
 }
 
-impl Clone for Server {
-    fn clone(&self) -> Server {
-        Server { proto: self.proto.clone() }
-    }
-}
+// impl Clone for Server {
+//     fn clone(&self) -> Server {
+//         Server { proto: self.proto.clone() }
+//     }
+// }
 
 /// Memcached client
 ///
@@ -101,13 +100,9 @@ impl Client {
     /// as a array of tuples in this form
     ///
     /// `(address, weight)`.
-    pub fn connect(svrs: &[(&str, usize)], p: proto::ProtoType) -> IoResult<Client> {
+    pub fn connect(svrs: &[(&str, usize)], p: proto::ProtoType) -> io::Result<Client> {
         if svrs.is_empty() {
-            return Err(IoError {
-                kind: OtherIoError,
-                desc: "Empty server list",
-                detail: None,
-            })
+            return Err(io::Error::new(io::ErrorKind::Other, "Empty server list", None));
         }
         let mut servers = Vec::with_capacity(svrs.len());
         let mut bucket = Vec::new();
@@ -301,7 +296,7 @@ mod test {
     use test::Bencher;
     use client::Client;
     use proto::{Operation, NoReplyOperation, ProtoType};
-    use std::rand::random;
+    use rand::random;
 
     fn generate_data(len: usize) -> Vec<u8> {
         (0..len).map(|_| random()).collect()
