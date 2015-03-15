@@ -11,13 +11,10 @@ license = "MIT"
 name = "memcached"
 
 [dependencies]
-#byteorder = "*"
+byteorder = "*"
 semver = "*"
 rand = "*"
+#crc32 = "*"
 
 [dependencies.crc32]
-#crc32 = "*"
 git = "https://github.com/zonyitoo/crc32.git"
-
-[dependencies.byteorder]
-git = "https://github.com/BurntSushi/byteorder.git"

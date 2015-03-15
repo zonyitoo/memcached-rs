@@ -49,7 +49,7 @@
 
 #![allow(dead_code)]
 
-use std::io::{self, Write, Read, ReadExt};
+use std::io::{self, Write, Read};
 
 use byteorder::{ReadBytesExt, WriteBytesExt, BigEndian};
 
@@ -444,7 +444,7 @@ impl RequestHeader {
     }
 
     #[inline]
-    pub fn read_from<R: ReadExt>(reader: &mut R) -> io::Result<RequestHeader> {
+    pub fn read_from<R: Read>(reader: &mut R) -> io::Result<RequestHeader> {
         let magic = try!(reader.read_u8());
 
         if magic != MAGIC_REQUEST {
@@ -538,7 +538,7 @@ impl ResponseHeader {
     }
 
     #[inline]
-    pub fn read_from<R: ReadExt>(reader: &mut R) -> io::Result<ResponseHeader> {
+    pub fn read_from<R: Read>(reader: &mut R) -> io::Result<ResponseHeader> {
         let magic = try!(reader.read_u8());
 
         if magic != MAGIC_RESPONSE {
@@ -598,7 +598,7 @@ impl RequestPacket {
     }
 
     #[inline]
-    pub fn read_from<R: ReadExt>(reader: &mut R) -> io::Result<RequestPacket> {
+    pub fn read_from<R: Read>(reader: &mut R) -> io::Result<RequestPacket> {
         let header = try!(RequestHeader::read_from(reader));
 
         let extra_len = header.extra_len as usize;
@@ -696,7 +696,7 @@ impl ResponsePacket {
     }
 
     #[inline]
-    pub fn read_from<R: ReadExt>(reader: &mut R) -> io::Result<ResponsePacket> {
+    pub fn read_from<R: Read>(reader: &mut R) -> io::Result<ResponsePacket> {
         let header = try!(ResponseHeader::read_from(reader));
 
         let extra_len = header.extra_len as usize;
