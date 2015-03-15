@@ -56,8 +56,14 @@ pub type MemCachedResult<T> = Result<T, Error>;
 impl error::Error for Error {
     fn description(&self) -> &str {
         match self {
-            &Error::BinaryProtoError(ref err) => err.description(),
-            &Error::IoError(ref err) => err.description(),
+            &Error::BinaryProtoError(ref err) => {
+                use std::error::Error;
+                err.description()
+            },
+            &Error::IoError(ref err) => {
+                use std::error::Error;
+                err.description()
+            },
             &Error::OtherError { desc, .. } => desc,
         }
     }

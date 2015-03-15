@@ -1311,7 +1311,7 @@ mod test {
     }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_quit() {
         let mut client = get_client();
         assert!(client.quit().is_ok());
