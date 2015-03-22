@@ -22,7 +22,7 @@
 #![crate_type = "lib"]
 #![crate_name = "memcached"]
 
-#![feature(box_syntax, io, net, core, test)]
+#![feature(box_syntax, io, core, test)]
 
 #[macro_use] extern crate log;
 extern crate crc32;
