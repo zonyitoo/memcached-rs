@@ -3,9 +3,6 @@ language: rust
 services:
     - memcached
 
-before_install:
-    - cargo update
-
 script:
     - cargo build -v
     - cargo test -v
