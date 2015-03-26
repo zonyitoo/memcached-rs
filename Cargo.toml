@@ -1,6 +1,6 @@
 [package]
 name = "memcached-rs"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Y. T. CHUNG <zonyitoo@gmail.com>"]
 description = "A MemCached Library in Rust"
 repository = "https://github.com/zonyitoo/memcached-rs"
@@ -14,7 +14,5 @@ name = "memcached"
 byteorder = "*"
 semver = "*"
 rand = "*"
-#crc32 = "*"
-
-[dependencies.crc32]
-git = "https://github.com/zonyitoo/crc32.git"
+crc = "*"
+log = "*"

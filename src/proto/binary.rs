@@ -245,7 +245,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => {
-                let mut extrabufr = BufReader::new(resp.extra.as_slice());
+                let mut extrabufr = BufReader::new(&resp.extra[..]);
                 let flags = try!(extrabufr.read_u32::<BigEndian>());
 
                 Ok((resp.value, flags))
@@ -274,7 +274,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => {
-                let mut extrabufr = BufReader::new(resp.extra.as_slice());
+                let mut extrabufr = BufReader::new(&resp.extra[..]);
                 let flags = try!(extrabufr.read_u32::<BigEndian>());
 
                 Ok((resp.key, resp.value, flags))
@@ -311,7 +311,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => {
-                let mut bufr = BufReader::new(resp.value.as_slice());
+                let mut bufr = BufReader::new(&resp.value[..]);
                 Ok(try!(bufr.read_u64::<BigEndian>()))
             },
             _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
@@ -346,7 +346,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => {
-                let mut bufr = BufReader::new(resp.value.as_slice());
+                let mut bufr = BufReader::new(&resp.value[..]);
                 Ok(try!(bufr.read_u64::<BigEndian>()))
             },
             _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
@@ -520,7 +520,7 @@ impl<T: Read + Write + Send> ServerOperation for BinaryProto<T> {
         match resp.header.status {
             Status::NoError => {
                 let val = resp.value;
-                let verstr = match str::from_utf8(val.as_slice()) {
+                let verstr = match str::from_utf8(&val[..]) {
                     Ok(vs) => vs,
                     Err(..) => return Err(proto::Error::OtherError {
                         desc: "Response is not a string",
@@ -681,7 +681,7 @@ impl<T: Read + Write + Send> MultiOperation for BinaryProto<T> {
                 return Ok(result);
             }
 
-            let mut extrabufr = BufReader::new(resp.extra.as_slice());
+            let mut extrabufr = BufReader::new(&resp.extra[..]);
             let flags = try!(extrabufr.read_u32::<BigEndian>());
 
             result.insert(resp.key, (resp.value, flags));
@@ -970,7 +970,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => {
-                let mut extrabufr = BufReader::new(resp.extra.as_slice());
+                let mut extrabufr = BufReader::new(&resp.extra[..]);
                 let flags = try!(extrabufr.read_u32::<BigEndian>());
 
                 Ok((resp.value, flags, resp.header.cas))
@@ -999,7 +999,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => {
-                let mut extrabufr = BufReader::new(resp.extra.as_slice());
+                let mut extrabufr = BufReader::new(&resp.extra[..]);
                 let flags = try!(extrabufr.read_u32::<BigEndian>());
 
                 Ok((resp.key, resp.value, flags, resp.header.cas))
@@ -1037,7 +1037,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => {
-                let mut bufr = BufReader::new(resp.value.as_slice());
+                let mut bufr = BufReader::new(&resp.value[..]);
                 Ok((try!(bufr.read_u64::<BigEndian>()), resp.header.cas))
             },
             _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
@@ -1073,7 +1073,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => {
-                let mut bufr = BufReader::new(resp.value.as_slice());
+                let mut bufr = BufReader::new(&resp.value[..]);
                 Ok((try!(bufr.read_u64::<BigEndian>()), resp.header.cas))
             },
             _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),

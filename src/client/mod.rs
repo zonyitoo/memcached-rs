@@ -28,7 +28,7 @@ use std::u32;
 use proto::{Proto, Operation, ServerOperation, NoReplyOperation, CasOperation};
 use proto::{MemCachedResult, self};
 
-use crc32::crc32;
+use crc::crc32;
 
 struct Server {
     pub proto: Box<Proto + Send>,
@@ -120,7 +120,7 @@ impl Client {
     }
 
     fn find_server_index_by_key(&mut self, key: &[u8]) -> usize {
-        let hash = (crc32(u32::MAX, key) >> 16) & 0x7fff;
+        let hash = (crc32::checksum_ieee(key) >> 16) & 0x7fff;
         self.bucket[(hash as usize) % self.bucket.len()]
     }
 
