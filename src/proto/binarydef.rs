@@ -802,7 +802,7 @@ mod test {
             let resp_packet = ResponsePacket::read_from(&mut stream).unwrap();
 
             assert!(resp_packet.header.status == proto::binary::Status::NoError);
-            assert_eq!(resp_packet.value.as_slice(), b"world");
+            assert_eq!(&resp_packet.value[..], b"world");
         }
 
         {

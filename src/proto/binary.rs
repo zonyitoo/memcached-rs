@@ -1426,9 +1426,9 @@ mod test {
         let mut client = get_client();
 
         let mut data = BTreeMap::new();
-        data.insert(b"test:multi_hello1", (b"world1", 0xdeadbeef, 120));
-        data.insert(b"test:multi_hello2", (b"world2", 0xdeadbeef, 120));
-        data.insert(b"test:multi_lastone", (b"last!", 0xdeadbeef, 120));
+        data.insert(&b"test:multi_hello1"[..], (&b"world1"[..], 0xdeadbeef, 120));
+        data.insert(&b"test:multi_hello2"[..], (&b"world2"[..], 0xdeadbeef, 120));
+        data.insert(&b"test:multi_lastone"[..], (&b"last!"[..], 0xdeadbeef, 120));
 
         let set_resp = client.set_multi(data);
         assert!(set_resp.is_ok());

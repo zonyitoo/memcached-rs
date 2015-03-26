@@ -23,7 +23,6 @@
 
 use std::net::TcpStream;
 use std::io;
-use std::u32;
 
 use proto::{Proto, Operation, ServerOperation, NoReplyOperation, CasOperation};
 use proto::{MemCachedResult, self};
@@ -80,7 +79,7 @@ impl Server {
 ///
 /// client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
 /// let (value, flags) = client.get(b"Foo").unwrap();
-/// assert_eq!(value.as_slice(), b"Bar");
+/// assert_eq!(&value[..], b"Bar");
 /// assert_eq!(flags, 0xdeadbeef);
 ///
 /// client.set_noreply(b"key:dontreply", b"1", 0x00000001, 20).unwrap();
@@ -309,7 +308,7 @@ mod test {
 
         let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
-        b.iter(|| client.set(key, val.as_slice(), 0, 2));
+        b.iter(|| client.set(key, &val[..], 0, 2));
     }
 
     #[bench]
@@ -319,7 +318,7 @@ mod test {
 
         let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
-        b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
+        b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
 
     #[bench]
@@ -329,7 +328,7 @@ mod test {
 
         let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
-        b.iter(|| client.set(key, val.as_slice(), 0, 2));
+        b.iter(|| client.set(key, &val[..], 0, 2));
     }
 
     #[bench]
@@ -339,7 +338,7 @@ mod test {
 
         let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
-        b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
+        b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
 
     #[bench]
@@ -349,7 +348,7 @@ mod test {
 
         let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
-        b.iter(|| client.set(key, val.as_slice(), 0, 2));
+        b.iter(|| client.set(key, &val[..], 0, 2));
     }
 
     #[bench]
@@ -359,7 +358,7 @@ mod test {
 
         let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
-        b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
+        b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
 
     #[bench]
@@ -369,7 +368,7 @@ mod test {
 
         let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
-        b.iter(|| client.set(key, val.as_slice(), 0, 2));
+        b.iter(|| client.set(key, &val[..], 0, 2));
     }
 
     #[bench]
@@ -379,7 +378,7 @@ mod test {
 
         let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
-        b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
+        b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
 
     #[bench]
@@ -389,7 +388,7 @@ mod test {
 
         let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
-        b.iter(|| client.set(key, val.as_slice(), 0, 2));
+        b.iter(|| client.set(key, &val[..], 0, 2));
     }
 
     #[bench]
@@ -399,6 +398,6 @@ mod test {
 
         let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
-        b.iter(|| client.set_noreply(key, val.as_slice(), 0, 2));
+        b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
 }

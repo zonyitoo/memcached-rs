@@ -1,6 +1,6 @@
 [package]
 name = "memcached-rs"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Y. T. CHUNG <zonyitoo@gmail.com>"]
 description = "A MemCached Library in Rust"
 repository = "https://github.com/zonyitoo/memcached-rs"
