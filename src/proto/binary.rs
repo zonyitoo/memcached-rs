@@ -23,7 +23,8 @@ use std::io::{BufStream, Cursor, BufReader, Read, Write};
 use std::string::String;
 use std::str;
 use std::collections::BTreeMap;
-use std::error::{self, FromError};
+use std::convert::From;
+use std::error;
 use std::fmt;
 
 use byteorder::{WriteBytesExt, ReadBytesExt, BigEndian};
@@ -135,7 +136,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(()),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -166,7 +167,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(()),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -190,7 +191,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(()),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -221,7 +222,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(()),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -250,7 +251,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
                 Ok((resp.value, flags))
             },
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -279,7 +280,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
                 Ok((resp.key, resp.value, flags))
             },
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -314,7 +315,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
                 let mut bufr = BufReader::new(&resp.value[..]);
                 Ok(try!(bufr.read_u64::<BigEndian>()))
             },
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -349,7 +350,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
                 let mut bufr = BufReader::new(&resp.value[..]);
                 Ok(try!(bufr.read_u64::<BigEndian>()))
             },
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -373,7 +374,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(()),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -397,7 +398,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(()),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -427,7 +428,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(()),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 }
@@ -453,7 +454,7 @@ impl<T: Read + Write + Send> ServerOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(()),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -483,7 +484,7 @@ impl<T: Read + Write + Send> ServerOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(()),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -496,7 +497,7 @@ impl<T: Read + Write + Send> ServerOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(()),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -536,7 +537,7 @@ impl<T: Read + Write + Send> ServerOperation for BinaryProto<T> {
                     }),
                 })
             },
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -560,7 +561,7 @@ impl<T: Read + Write + Send> ServerOperation for BinaryProto<T> {
             }
             match resp.header.status {
                 Status::NoError => {},
-                _ => return Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+                _ => return Err(From::from(Error::from_status(resp.header.status, None))),
             }
 
             if resp.key.len() == 0 && resp.value.len() == 0 {
@@ -617,7 +618,7 @@ impl<T: Read + Write + Send> MultiOperation for BinaryProto<T> {
 
             match resp.header.status {
                 Status::NoError => {},
-                _ => return Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+                _ => return Err(From::from(Error::from_status(resp.header.status, None))),
             }
 
             if resp.header.command == Command::Noop {
@@ -645,7 +646,7 @@ impl<T: Read + Write + Send> MultiOperation for BinaryProto<T> {
 
             match resp.header.status {
                 Status::NoError | Status::KeyNotFound => {},
-                _ => return Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+                _ => return Err(From::from(Error::from_status(resp.header.status, None))),
             }
 
             if resp.header.command == Command::Noop {
@@ -674,7 +675,7 @@ impl<T: Read + Write + Send> MultiOperation for BinaryProto<T> {
             let resp = try!(ResponsePacket::read_from(&mut self.stream));
             match resp.header.status {
                 Status::NoError => {},
-                _ => return Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+                _ => return Err(From::from(Error::from_status(resp.header.status, None))),
             }
 
             if resp.header.command == Command::Noop {
@@ -884,7 +885,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(resp.header.cas),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -915,7 +916,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(resp.header.cas),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -946,7 +947,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(resp.header.cas),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -975,7 +976,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
                 Ok((resp.value, flags, resp.header.cas))
             },
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -1004,7 +1005,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
                 Ok((resp.key, resp.value, flags, resp.header.cas))
             },
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -1040,7 +1041,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
                 let mut bufr = BufReader::new(&resp.value[..]);
                 Ok((try!(bufr.read_u64::<BigEndian>()), resp.header.cas))
             },
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -1076,7 +1077,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
                 let mut bufr = BufReader::new(&resp.value[..]);
                 Ok((try!(bufr.read_u64::<BigEndian>()), resp.header.cas))
             },
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -1100,7 +1101,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(resp.header.cas),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -1124,7 +1125,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(resp.header.cas),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -1154,7 +1155,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => Ok(resp.header.cas),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 }
@@ -1174,7 +1175,7 @@ impl<T: Read + Write + Send> AuthOperation for BinaryProto<T> {
 
         match resp.header.status {
             Status::NoError => {},
-            _ => return Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => return Err(From::from(Error::from_status(resp.header.status, None))),
         }
 
         match str::from_utf8(&resp.value[..]) {
@@ -1207,7 +1208,7 @@ impl<T: Read + Write + Send> AuthOperation for BinaryProto<T> {
             Status::AuthenticationFurtherStepRequired => Ok(AuthResponse::Continue(resp.value)),
             Status::NoError => Ok(AuthResponse::Succeeded),
             Status::AuthenticationRequired => Ok(AuthResponse::Failed),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
@@ -1228,7 +1229,7 @@ impl<T: Read + Write + Send> AuthOperation for BinaryProto<T> {
             Status::AuthenticationFurtherStepRequired => Ok(AuthResponse::Continue(resp.value)),
             Status::NoError => Ok(AuthResponse::Succeeded),
             Status::AuthenticationRequired => Ok(AuthResponse::Failed),
-            _ => Err(FromError::from_error(Error::from_status(resp.header.status, None))),
+            _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 }

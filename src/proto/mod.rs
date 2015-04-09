@@ -25,6 +25,7 @@ use std::fmt::{Display, Formatter, self};
 use std::collections::BTreeMap;
 use std::io;
 use std::error;
+use std::convert::From;
 
 use semver::Version;
 
@@ -36,12 +37,12 @@ mod binarydef;
 pub mod binary;
 
 /// Protocol type
-#[derive(Copy)]
+#[derive(Copy, Clone)]
 pub enum ProtoType {
     Binary,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum Error {
     BinaryProtoError(binary::Error),
     IoError(io::Error),
@@ -85,21 +86,21 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::FromError<io::Error> for Error {
-    fn from_error(err: io::Error) -> Error {
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Error {
         Error::IoError(err)
     }
 }
 
-impl error::FromError<binary::Error> for Error {
-    fn from_error(err: binary::Error) -> Error {
+impl From<binary::Error> for Error {
+    fn from(err: binary::Error) -> Error {
         Error::BinaryProtoError(err)
     }
 }
 
-impl error::FromError<byteorder::Error> for Error {
-    fn from_error(err: byteorder::Error) -> Error {
-        error::FromError::from_error(err)
+impl From<byteorder::Error> for Error {
+    fn from(err: byteorder::Error) -> Error {
+        From::from(err)
     }
 }
 

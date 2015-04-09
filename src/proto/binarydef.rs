@@ -448,19 +448,19 @@ impl RequestHeader {
         let magic = try!(reader.read_u8());
 
         if magic != MAGIC_REQUEST {
-            return Err(io::Error::new(io::ErrorKind::Other, "Invalid magic", None));
+            return Err(io::Error::new(io::ErrorKind::Other, "Invalid magic"));
         }
 
         Ok(RequestHeader {
             command: match Command::from_code(try!(reader.read_u8())) {
                 Some(c) => c,
-                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid command", None)),
+                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid command")),
             },
             key_len: try!(reader.read_u16::<BigEndian>()),
             extra_len: try!(reader.read_u8()),
             data_type: match DataType::from_code(try!(reader.read_u8())) {
                 Some(d) => d,
-                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid data type", None))
+                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid data type"))
             },
             vbucket_id: try!(reader.read_u16::<BigEndian>()),
             body_len: try!(reader.read_u32::<BigEndian>()),
@@ -542,23 +542,23 @@ impl ResponseHeader {
         let magic = try!(reader.read_u8());
 
         if magic != MAGIC_RESPONSE {
-            return Err(io::Error::new(io::ErrorKind::Other, "Invalid magic", None));
+            return Err(io::Error::new(io::ErrorKind::Other, "Invalid magic"));
         }
 
         Ok(ResponseHeader {
             command: match Command::from_code(try!(reader.read_u8())) {
                 Some(c) => c,
-                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid command", None)),
+                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid command")),
             },
             key_len: try!(reader.read_u16::<BigEndian>()),
             extra_len: try!(reader.read_u8()),
             data_type: match DataType::from_code(try!(reader.read_u8())) {
                 Some(d) => d,
-                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid data type", None))
+                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid data type"))
             },
             status: match Status::from_code(try!(reader.read_u16::<BigEndian>())) {
                 Some(s) => s,
-                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid status", None)),
+                None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid status")),
             },
             body_len: try!(reader.read_u32::<BigEndian>()),
             opaque: try!(reader.read_u32::<BigEndian>()),

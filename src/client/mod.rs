@@ -101,7 +101,7 @@ impl Client {
     /// `(address, weight)`.
     pub fn connect(svrs: &[(&str, usize)], p: proto::ProtoType) -> io::Result<Client> {
         if svrs.is_empty() {
-            return Err(io::Error::new(io::ErrorKind::Other, "Empty server list", None));
+            return Err(io::Error::new(io::ErrorKind::Other, "Empty server list"));
         }
         let mut servers = Vec::with_capacity(svrs.len());
         let mut bucket = Vec::new();
