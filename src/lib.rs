@@ -25,11 +25,16 @@
 #![feature(box_syntax, test)]
 
 #[macro_use] extern crate log;
-extern crate crc;
+extern crate env_logger;
+extern crate conhash;
 extern crate test;
 extern crate byteorder;
 extern crate semver;
 extern crate rand;
+#[cfg(unix)]
+extern crate unix_socket;
+
+pub use client::Client;
 
 pub mod proto;
 pub mod client;

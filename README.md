@@ -11,7 +11,7 @@ extern crate memcached;
 
 use std::collections::TreeMap;
 
-use memcached::client::Client;
+use memcached::Client;
 use memcached::proto::{Operation, MultiOperation, NoReplyOperation, CasOperation, ProtoType};
 
 fn main() {

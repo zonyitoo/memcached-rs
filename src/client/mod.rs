@@ -23,14 +23,22 @@
 
 use std::net::TcpStream;
 use std::io;
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::ops::Deref;
+use std::path::Path;
 
-use proto::{Proto, Operation, ServerOperation, NoReplyOperation, CasOperation};
+use conhash::{ConsistentHash, Node};
+
+#[cfg(unix)]
+use unix_socket::UnixStream;
+
+use proto::{Proto, Operation, NoReplyOperation, CasOperation};
 use proto::{MemCachedResult, self};
-
-use crc::crc32;
 
 struct Server {
     pub proto: Box<Proto + Send>,
+    addr: String,
 }
 
 impl Server {
@@ -45,18 +53,37 @@ impl Server {
                             let stream = try!(TcpStream::connect(addr));
                             box proto::BinaryProto::new(stream) as Box<Proto + Send>
                         },
-                        // (Some("unix"), Some(addr)) => {
-                        //     let stream = try!(UnixStream::connect(&Path::new(addr)));
-                        //     box proto::BinaryProto::new(stream) as Box<Proto + Send>
-                        // },
+                        #[cfg(unix)]
+                        (Some("unix"), Some(addr)) => {
+                            let stream = try!(UnixStream::connect(&Path::new(addr)));
+                            box proto::BinaryProto::new(stream) as Box<Proto + Send>
+                        },
                         (Some(prot), _) => {
                             panic!("Unsupported protocol: {}", prot);
                         },
                         _ => panic!("Malformed address"),
                     }
                 }
-            }
+            },
+            addr: addr.to_owned(),
         })
+    }
+}
+
+#[derive(Clone)]
+struct ServerRef(Rc<RefCell<Server>>);
+
+impl Node for ServerRef {
+    fn name(&self) -> String {
+        self.0.borrow().addr.clone()
+    }
+}
+
+impl Deref for ServerRef {
+    type Target = Rc<RefCell<Server>>;
+
+    fn deref(&self) -> &Rc<RefCell<Server>> {
+        &self.0
     }
 }
 
@@ -88,8 +115,7 @@ impl Server {
 /// client.increment_cas(b"key:numerical", 1, 1, 20, cas_val).unwrap();
 /// ```
 pub struct Client {
-    servers: Vec<Box<Server>>,
-    bucket: Vec<usize>,
+    servers: ConsistentHash<ServerRef>,
 }
 
 impl Client {
@@ -100,193 +126,175 @@ impl Client {
     ///
     /// `(address, weight)`.
     pub fn connect(svrs: &[(&str, usize)], p: proto::ProtoType) -> io::Result<Client> {
-        if svrs.is_empty() {
-            return Err(io::Error::new(io::ErrorKind::Other, "Empty server list"));
-        }
-        let mut servers = Vec::with_capacity(svrs.len());
-        let mut bucket = Vec::new();
-        for &(addr, weight) in svrs.iter() {
-            servers.push(box try!(Server::connect(addr, p)));
 
-            for _ in (0..weight) {
-                bucket.push(servers.len() - 1);
-            }
+        assert!(!svrs.is_empty(), "Server list should not be empty");
+
+        let mut servers = ConsistentHash::new();
+        for &(addr, weight) in svrs.iter() {
+            let svr = try!(Server::connect(addr, p));
+            servers.add(&ServerRef(Rc::new(RefCell::new(svr))), weight);
         }
+
         Ok(Client {
             servers: servers,
-            bucket: bucket,
         })
     }
 
-    fn find_server_index_by_key(&mut self, key: &[u8]) -> usize {
-        let hash = (crc32::checksum_ieee(key) >> 16) & 0x7fff;
-        self.bucket[(hash as usize) % self.bucket.len()]
-    }
-
-    fn find_server_by_key(&mut self, key: &[u8]) -> &mut Box<Server> {
-        let idx = self.find_server_index_by_key(key);
-        &mut self.servers[idx]
-    }
-
-    /// Flush data in all servers
-    pub fn flush_all(&mut self) -> MemCachedResult<()> {
-        for s in self.servers.iter_mut() {
-            try!(s.proto.flush(0));
-        }
-        Ok(())
+    fn find_server_by_key<'a>(&'a mut self, key: &[u8]) -> &'a mut ServerRef {
+        self.servers.get_mut(key).expect("No valid server found")
     }
 }
 
 impl Operation for Client {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.set(key, value, flags, expiration)
+        server.borrow_mut().proto.set(key, value, flags, expiration)
     }
 
     fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.add(key, value, flags, expiration)
+        server.borrow_mut().proto.add(key, value, flags, expiration)
     }
 
     fn delete(&mut self, key: &[u8]) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.delete(key)
+        server.borrow_mut().proto.delete(key)
     }
 
     fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.replace(key, value, flags, expiration)
+        server.borrow_mut().proto.replace(key, value, flags, expiration)
     }
 
     fn get(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32)> {
         let server = self.find_server_by_key(key);
-        server.proto.get(key)
+        server.borrow_mut().proto.get(key)
     }
 
     fn getk(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, Vec<u8>, u32)> {
        let server = self.find_server_by_key(key);
-       server.proto.getk(key)
+       server.borrow_mut().proto.getk(key)
     }
 
     fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.proto.increment(key, amount, initial, expiration)
+        server.borrow_mut().proto.increment(key, amount, initial, expiration)
     }
 
     fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.proto.increment(key, amount, initial, expiration)
+        server.borrow_mut().proto.increment(key, amount, initial, expiration)
     }
 
     fn append(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.append(key, value)
+        server.borrow_mut().proto.append(key, value)
     }
 
     fn prepend(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.prepend(key, value)
+        server.borrow_mut().proto.prepend(key, value)
     }
 
     fn touch(&mut self, key: &[u8], expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.touch(key, expiration)
+        server.borrow_mut().proto.touch(key, expiration)
     }
 }
 
 impl NoReplyOperation for Client {
     fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.set_noreply(key, value, flags, expiration)
+        server.borrow_mut().proto.set_noreply(key, value, flags, expiration)
     }
 
     fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.add_noreply(key, value, flags, expiration)
+        server.borrow_mut().proto.add_noreply(key, value, flags, expiration)
     }
 
     fn delete_noreply(&mut self, key: &[u8]) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.delete_noreply(key)
+        server.borrow_mut().proto.delete_noreply(key)
     }
 
     fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.replace_noreply(key, value, flags, expiration)
+        server.borrow_mut().proto.replace_noreply(key, value, flags, expiration)
     }
 
     fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.increment_noreply(key, amount, initial, expiration)
+        server.borrow_mut().proto.increment_noreply(key, amount, initial, expiration)
     }
 
     fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.decrement_noreply(key, amount, initial, expiration)
+        server.borrow_mut().proto.decrement_noreply(key, amount, initial, expiration)
     }
 
     fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.append_noreply(key, value)
+        server.borrow_mut().proto.append_noreply(key, value)
     }
 
     fn prepend_noreply(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.proto.prepend_noreply(key, value)
+        server.borrow_mut().proto.prepend_noreply(key, value)
     }
 }
 
 impl CasOperation for Client {
     fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.proto.set_cas(key, value, flags, expiration, cas)
+        server.borrow_mut().proto.set_cas(key, value, flags, expiration, cas)
     }
 
     fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.proto.add_cas(key, value, flags, expiration)
+        server.borrow_mut().proto.add_cas(key, value, flags, expiration)
     }
 
     fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.proto.replace_cas(key, value, flags, expiration, cas)
+        server.borrow_mut().proto.replace_cas(key, value, flags, expiration, cas)
     }
 
     fn get_cas(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32, u64)> {
         let server = self.find_server_by_key(key);
-        server.proto.get_cas(key)
+        server.borrow_mut().proto.get_cas(key)
     }
 
     fn getk_cas(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, Vec<u8>, u32, u64)> {
         let server = self.find_server_by_key(key);
-        server.proto.getk_cas(key)
+        server.borrow_mut().proto.getk_cas(key)
     }
 
     fn increment_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
             -> MemCachedResult<(u64, u64)> {
         let server = self.find_server_by_key(key);
-        server.proto.increment_cas(key, amount, initial, expiration, cas)
+        server.borrow_mut().proto.increment_cas(key, amount, initial, expiration, cas)
     }
 
     fn decrement_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
             -> MemCachedResult<(u64, u64)> {
         let server = self.find_server_by_key(key);
-        server.proto.decrement_cas(key, amount, initial, expiration, cas)
+        server.borrow_mut().proto.decrement_cas(key, amount, initial, expiration, cas)
     }
 
     fn append_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.proto.append_cas(key, value, cas)
+        server.borrow_mut().proto.append_cas(key, value, cas)
     }
 
     fn prepend_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.proto.prepend_cas(key, value, cas)
+        server.borrow_mut().proto.prepend_cas(key, value, cas)
     }
 
     fn touch_cas(&mut self, key: &[u8], expiration: u32, cas: u64) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.proto.touch_cas(key, expiration, cas)
+        server.borrow_mut().proto.touch_cas(key, expiration, cas)
     }
 }
 
