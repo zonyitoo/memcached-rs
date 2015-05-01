@@ -1427,16 +1427,16 @@ mod test {
 
         {
             let add_resp = client.add(KEY, INIT_VAL, 0xdeadbeef, 120);
-            assert!(add_resp.is_ok());
+            assert!(add_resp.is_ok(), "{:?}", add_resp);
         }
 
         {
             let get_resp = client.get(KEY);
-            assert!(get_resp.is_ok());
+            assert!(get_resp.is_ok(), "{:?}", get_resp);
 
             assert_eq!(get_resp.unwrap(), (INIT_VAL.to_vec(), 0xdeadbeef));
             let add_resp = client.add(KEY, ADD_VAL, 0xdeadbeef, 120);
-            assert!(add_resp.is_err());
+            assert!(add_resp.is_err(), "{:?}", add_resp);
         }
 
         assert!(client.delete(KEY).is_ok());
