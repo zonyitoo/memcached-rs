@@ -22,7 +22,7 @@
 #![crate_type = "lib"]
 #![crate_name = "memcached"]
 
-#![feature(box_syntax, test)]
+#![feature(box_syntax, test, buf_stream)]
 
 #[macro_use] extern crate log;
 extern crate env_logger;
