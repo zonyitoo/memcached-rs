@@ -19,7 +19,7 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-use std::io::{BufRead, Cursor, BufReader, Read, Write};
+use std::io::{BufRead, Cursor, BufReader, Write};
 use std::string::String;
 use std::str;
 use std::collections::BTreeMap;
@@ -1327,6 +1327,7 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
 
 #[cfg(test)]
 mod test {
+    use std::io::BufStream;
     use std::net::TcpStream;
     use std::collections::BTreeMap;
     use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation,
@@ -1334,9 +1335,9 @@ mod test {
 
     const SERVER_ADDR: &'static str = "127.0.0.1:11211";
 
-    fn get_client() -> BinaryProto<TcpStream> {
+    fn get_client() -> BinaryProto<BufStream<TcpStream>> {
         let stream = TcpStream::connect(SERVER_ADDR).unwrap();
-        BinaryProto::new(stream)
+        BinaryProto::new(BufStream::new(stream))
     }
 
     #[test]

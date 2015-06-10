@@ -35,7 +35,6 @@ extern crate rand;
 extern crate unix_socket;
 
 pub use client::Client;
-pub use proto::ProtoType;
 
-mod proto;
+pub mod proto;
 pub mod client;
