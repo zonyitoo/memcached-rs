@@ -163,13 +163,13 @@ pub enum Status {
 impl Status {
     /// Get the binary code of the status
     #[inline]
-    pub fn code(&self) -> u16 {
+    pub fn to_u16(&self) -> u16 {
         *self as u16
     }
 
     /// Generate a Status from binary code
     #[inline]
-    pub fn from_code(code: u16) -> Option<Status> {
+    pub fn from_u16(code: u16) -> Option<Status> {
         match code {
             STATUS_NO_ERROR => Some(Status::NoError),
             STATUS_KEY_NOT_FOUND => Some(Status::KeyNotFound),
@@ -284,12 +284,12 @@ pub enum Command {
 
 impl Command {
     #[inline]
-    fn code(&self) -> u8 {
+    fn to_u8(&self) -> u8 {
         *self as u8
     }
 
     #[inline]
-    fn from_code(code: u8) -> Option<Command> {
+    fn from_u8(code: u8) -> Option<Command> {
         match code {
             OPCODE_GET => Some(Command::Get),
             OPCODE_SET => Some(Command::Set),
@@ -361,14 +361,14 @@ pub enum DataType {
 
 impl DataType {
     #[inline]
-    fn code(&self) -> u8 {
+    fn to_u8(&self) -> u8 {
         match *self {
             DataType::RawBytes => DATA_TYPE_RAW_BYTES,
         }
     }
 
     #[inline]
-    fn from_code(code: u8) -> Option<DataType> {
+    fn from_u8(code: u8) -> Option<DataType> {
         match code {
             DATA_TYPE_RAW_BYTES => Some(DataType::RawBytes),
             _ => None,
@@ -431,10 +431,10 @@ impl RequestHeader {
     #[inline]
     pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         try!(writer.write_u8(MAGIC_REQUEST));
-        try!(writer.write_u8(self.command.code()));
+        try!(writer.write_u8(self.command.to_u8()));
         try!(writer.write_u16::<BigEndian>(self.key_len));
         try!(writer.write_u8(self.extra_len));
-        try!(writer.write_u8(self.data_type.code()));
+        try!(writer.write_u8(self.data_type.to_u8()));
         try!(writer.write_u16::<BigEndian>(self.vbucket_id));
         try!(writer.write_u32::<BigEndian>(self.body_len));
         try!(writer.write_u32::<BigEndian>(self.opaque));
@@ -452,13 +452,13 @@ impl RequestHeader {
         }
 
         Ok(RequestHeader {
-            command: match Command::from_code(try!(reader.read_u8())) {
+            command: match Command::from_u8(try!(reader.read_u8())) {
                 Some(c) => c,
                 None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid command")),
             },
             key_len: try!(reader.read_u16::<BigEndian>()),
             extra_len: try!(reader.read_u8()),
-            data_type: match DataType::from_code(try!(reader.read_u8())) {
+            data_type: match DataType::from_u8(try!(reader.read_u8())) {
                 Some(d) => d,
                 None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid data type"))
             },
@@ -525,11 +525,11 @@ impl ResponseHeader {
     #[inline]
     pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         try!(writer.write_u8(MAGIC_RESPONSE));
-        try!(writer.write_u8(self.command.code()));
+        try!(writer.write_u8(self.command.to_u8()));
         try!(writer.write_u16::<BigEndian>(self.key_len));
         try!(writer.write_u8(self.extra_len));
-        try!(writer.write_u8(self.data_type.code()));
-        try!(writer.write_u16::<BigEndian>(self.status.code()));
+        try!(writer.write_u8(self.data_type.to_u8()));
+        try!(writer.write_u16::<BigEndian>(self.status.to_u16()));
         try!(writer.write_u32::<BigEndian>(self.body_len));
         try!(writer.write_u32::<BigEndian>(self.opaque));
         try!(writer.write_u64::<BigEndian>(self.cas));
@@ -546,17 +546,17 @@ impl ResponseHeader {
         }
 
         Ok(ResponseHeader {
-            command: match Command::from_code(try!(reader.read_u8())) {
+            command: match Command::from_u8(try!(reader.read_u8())) {
                 Some(c) => c,
                 None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid command")),
             },
             key_len: try!(reader.read_u16::<BigEndian>()),
             extra_len: try!(reader.read_u8()),
-            data_type: match DataType::from_code(try!(reader.read_u8())) {
+            data_type: match DataType::from_u8(try!(reader.read_u8())) {
                 Some(d) => d,
                 None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid data type"))
             },
-            status: match Status::from_code(try!(reader.read_u16::<BigEndian>())) {
+            status: match Status::from_u16(try!(reader.read_u16::<BigEndian>())) {
                 Some(s) => s,
                 None => return Err(io::Error::new(io::ErrorKind::Other, "Invalid status")),
             },
