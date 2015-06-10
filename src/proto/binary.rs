@@ -19,7 +19,7 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-use std::io::{BufStream, Cursor, BufReader, Read, Write};
+use std::io::{BufRead, Cursor, BufReader, Read, Write};
 use std::string::String;
 use std::str;
 use std::collections::BTreeMap;
@@ -76,20 +76,20 @@ impl error::Error for Error {
     }
 }
 
-pub struct BinaryProto<T: Read + Write + Send> {
-    stream: BufStream<T>,
+pub struct BinaryProto<T: BufRead + Write + Send> {
+    stream: T,
 }
 
-// impl<T: Read + Write + Send> Proto for BinaryProto<T> {
+// impl<T: BufRead + Write + Send> Proto for BinaryProto<T> {
 //     fn clone(&self) -> Box<Proto + Send> {
 //         box BinaryProto { stream: BufStream::new(self.stream.get_ref().clone()) }
 //     }
 // }
 
-impl<T: Read + Write + Send> BinaryProto<T> {
+impl<T: BufRead + Write + Send> BinaryProto<T> {
     pub fn new(stream: T) -> BinaryProto<T> {
         BinaryProto {
-            stream: BufStream::new(stream),
+            stream: stream,
         }
     }
 
@@ -109,7 +109,7 @@ impl<T: Read + Write + Send> BinaryProto<T> {
     }
 }
 
-impl<T: Read + Write + Send> Operation for BinaryProto<T> {
+impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!("Set key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
@@ -464,7 +464,7 @@ impl<T: Read + Write + Send> Operation for BinaryProto<T> {
     }
 }
 
-impl<T: Read + Write + Send> ServerOperation for BinaryProto<T> {
+impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
     fn quit(&mut self) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!("Quit");
@@ -632,7 +632,7 @@ impl<T: Read + Write + Send> ServerOperation for BinaryProto<T> {
     }
 }
 
-impl<T: Read + Write + Send> MultiOperation for BinaryProto<T> {
+impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
     fn set_multi(&mut self, kv: BTreeMap<&[u8], (&[u8], u32, u32)>) -> MemCachedResult<()> {
         for (key, (value, flags, expiration)) in kv.into_iter() {
             let mut extra = [0u8; 8];
@@ -731,7 +731,7 @@ impl<T: Read + Write + Send> MultiOperation for BinaryProto<T> {
     }
 }
 
-impl<T: Read + Write + Send> NoReplyOperation for BinaryProto<T> {
+impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
     fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!("Set noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
@@ -914,7 +914,7 @@ impl<T: Read + Write + Send> NoReplyOperation for BinaryProto<T> {
     }
 }
 
-impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
+impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
     fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
         debug!("Set cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}, cas: {}",
@@ -1245,7 +1245,7 @@ impl<T: Read + Write + Send> CasOperation for BinaryProto<T> {
     }
 }
 
-impl<T: Read + Write + Send> AuthOperation for BinaryProto<T> {
+impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
     fn list_mechanisms(&mut self) -> MemCachedResult<Vec<String>> {
         let opaque = random::<u32>();
         debug!("List mechanisms");
