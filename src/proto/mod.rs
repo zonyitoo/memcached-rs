@@ -35,6 +35,7 @@ pub use self::binary::BinaryProto;
 
 mod binarydef;
 pub mod binary;
+pub mod text;
 
 /// Protocol type
 #[derive(Copy, Clone)]
@@ -45,6 +46,7 @@ pub enum ProtoType {
 #[derive(Debug)]
 pub enum Error {
     BinaryProtoError(binary::Error),
+    TextProtoError(text::Reply),
     IoError(io::Error),
     OtherError {
         desc: &'static str,
@@ -61,6 +63,9 @@ impl error::Error for Error {
                 use std::error::Error;
                 err.description()
             },
+            &Error::TextProtoError(ref err) => {
+                err.desc()
+            },
             &Error::IoError(ref err) => {
                 use std::error::Error;
                 err.description()
@@ -74,6 +79,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Error::BinaryProtoError(ref err) => err.fmt(f),
+            &Error::TextProtoError(ref err) => err.fmt(f),
             &Error::IoError(ref err) => err.fmt(f),
             &Error::OtherError { desc, ref detail } => {
                 try!(write!(f, "{}", desc));
@@ -95,6 +101,12 @@ impl From<io::Error> for Error {
 impl From<binary::Error> for Error {
     fn from(err: binary::Error) -> Error {
         Error::BinaryProtoError(err)
+    }
+}
+
+impl From<text::Reply> for Error {
+    fn from(err: text::Reply) -> Error {
+        Error::TextProtoError(err)
     }
 }
 
