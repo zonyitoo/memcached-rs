@@ -10,11 +10,15 @@ license = "MIT"
 [lib]
 name = "memcached"
 
+[features]
+nightly = []
+
 [dependencies]
-byteorder = "*"
-semver = "*"
-rand = "*"
-conhash = "*"
-log = "*"
-env_logger = "*"
-unix_socket = "*"
+bufstream = "0.1.1"
+byteorder = "0.3.11"
+semver = "0.1.20"
+rand = "0.3.9"
+conhash = "0.3.0"
+log = "0.3.1"
+env_logger = "0.3.1"
+unix_socket = "0.4.4"
