@@ -5,5 +5,5 @@ services:
     - memcached
 
 script:
-    - cargo build -v
-    - cargo test -v
+    - cargo build -v --features nightly
+    - cargo test -v --features nightly

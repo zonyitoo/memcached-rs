@@ -22,17 +22,19 @@
 #![crate_type = "lib"]
 #![crate_name = "memcached"]
 
-#![feature(box_syntax, test, buf_stream)]
+#![cfg_attr(feature = "nightly", feature(test))]
+#[cfg(feature = "nightly")]
+extern crate test;
 
 #[macro_use] extern crate log;
 extern crate env_logger;
 extern crate conhash;
-extern crate test;
 extern crate byteorder;
 extern crate semver;
 extern crate rand;
 #[cfg(unix)]
 extern crate unix_socket;
+extern crate bufstream;
 
 pub use client::Client;
 
