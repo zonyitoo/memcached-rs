@@ -1327,9 +1327,9 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
 
 #[cfg(test)]
 mod test {
-    use std::io::BufStream;
     use std::net::TcpStream;
     use std::collections::BTreeMap;
+    use bufstream::BufStream;
     use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation,
                 CasOperation, BinaryProto};
 

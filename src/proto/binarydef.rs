@@ -761,7 +761,8 @@ impl<'a> ResponsePacketRef<'a> {
 #[cfg(test)]
 mod test {
     use std::net::TcpStream;
-    use std::io::{BufStream, Write};
+    use std::io::Write;
+    use bufstream::BufStream;
 
     use proto;
     use proto::binarydef::{RequestPacket, ResponsePacket, Command, DataType};
