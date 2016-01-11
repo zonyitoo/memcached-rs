@@ -5,7 +5,7 @@ authors = ["Y. T. CHUNG <zonyitoo@gmail.com>"]
 description = "A MemCached Library in Rust"
 repository = "https://github.com/zonyitoo/memcached-rs"
 keywords = ["memcached"]
-license = "MIT"
+license = "MIT/Apache"
 
 [lib]
 name = "memcached"
