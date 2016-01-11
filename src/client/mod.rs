@@ -22,13 +22,15 @@
 //! Memcached client
 
 use std::net::TcpStream;
-use std::io::{self, BufStream};
+use std::io;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::ops::Deref;
 use std::path::Path;
 
 use conhash::{ConsistentHash, Node};
+
+use bufstream::BufStream;
 
 #[cfg(unix)]
 use unix_socket::UnixStream;
@@ -51,12 +53,12 @@ impl Server {
                     match (split.next(), split.next()) {
                         (Some("tcp"), Some(addr)) => {
                             let stream = try!(TcpStream::connect(addr));
-                            box proto::BinaryProto::new(BufStream::new(stream)) as Box<Proto + Send>
+                            Box::new(proto::BinaryProto::new(BufStream::new(stream))) as Box<Proto + Send>
                         },
                         #[cfg(unix)]
                         (Some("unix"), Some(addr)) => {
                             let stream = try!(UnixStream::connect(&Path::new(addr)));
-                            box proto::BinaryProto::new(BufStream::new(stream)) as Box<Proto + Send>
+                            Box::new(proto::BinaryProto::new(BufStream::new(stream))) as Box<Proto + Send>
                         },
                         (Some(prot), _) => {
                             panic!("Unsupported protocol: {}", prot);

@@ -1327,11 +1327,12 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
 
 #[cfg(test)]
 mod test {
-    use std::io::BufStream;
     use std::net::TcpStream;
     use std::collections::BTreeMap;
     use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation,
                 CasOperation, BinaryProto};
+
+    use bufstream::BufStream;
 
     const SERVER_ADDR: &'static str = "127.0.0.1:11211";
 

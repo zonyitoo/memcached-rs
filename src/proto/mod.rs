@@ -21,7 +21,7 @@
 
 //! Memcached protocol
 
-use std::fmt::{Display, Formatter, self};
+use std::fmt::{Display, self};
 use std::collections::BTreeMap;
 use std::io;
 use std::error;
@@ -100,7 +100,7 @@ impl From<binary::Error> for Error {
 
 impl From<byteorder::Error> for Error {
     fn from(err: byteorder::Error) -> Error {
-        From::from(err)
+        Error::IoError(From::from(err))
     }
 }
 

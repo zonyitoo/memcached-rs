@@ -761,10 +761,12 @@ impl<'a> ResponsePacketRef<'a> {
 #[cfg(test)]
 mod test {
     use std::net::TcpStream;
-    use std::io::{BufStream, Write};
+    use std::io::Write;
 
     use proto;
     use proto::binarydef::{RequestPacket, ResponsePacket, Command, DataType};
+
+    use bufstream::BufStream;
 
     fn test_stream() -> TcpStream {
         TcpStream::connect("127.0.0.1:11211").unwrap()

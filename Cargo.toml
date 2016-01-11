@@ -11,10 +11,13 @@ license = "MIT"
 name = "memcached"
 
 [dependencies]
-byteorder = "*"
-semver = "*"
-rand = "*"
-conhash = "*"
-log = "*"
+byteorder = "^0.4.2"
+semver = "^0.2.1"
+rand = "^0.3.13"
+conhash = "^0.3.0"
+log = "^0.3.4"
+unix_socket = "^0.5.0"
+bufstream = "^0.1.1"
+
+[dev-dependencies]
 env_logger = "*"
-unix_socket = "*"

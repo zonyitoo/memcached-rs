@@ -1,5 +1,3 @@
-#![feature(scoped)]
-
 extern crate memcached;
 #[macro_use] extern crate log;
 extern crate env_logger;
@@ -30,7 +28,7 @@ fn main() {
 
     let mut handlers = Vec::new();
     for _ in 0..4 {
-        let handler = thread::scoped(move|| {
+        let handler = thread::spawn(move|| {
             let mut client = Client::connect(&servers, ProtoType::Binary).unwrap();
             let (_, _, mut cas) = client.get_cas(b"key:dontreply").unwrap();
             for _ in 0..100 {
@@ -40,5 +38,9 @@ fn main() {
             }
         });
         handlers.push(handler);
+    }
+
+    for hdl in handlers {
+        hdl.join().unwrap();
     }
 }
