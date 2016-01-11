@@ -288,7 +288,7 @@ impl CasOperation for Client {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "nightly"))]
 mod test {
     use test::Bencher;
     use client::Client;

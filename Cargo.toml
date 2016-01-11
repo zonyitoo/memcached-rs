@@ -10,6 +10,9 @@ license = "MIT/Apache"
 [lib]
 name = "memcached"
 
+[features]
+nightly = []
+
 [dependencies]
 byteorder = "^0.4.2"
 semver = "^0.2.1"

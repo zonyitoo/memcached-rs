@@ -10,11 +10,12 @@
 #![crate_type = "lib"]
 #![crate_name = "memcached"]
 
-#![feature(test)]
+#![cfg_attr(feature = "nightly", feature(test))]
+#[cfg(feature = "nightly")]
+extern crate test;
 
 #[macro_use] extern crate log;
 extern crate conhash;
-extern crate test;
 extern crate byteorder;
 extern crate semver;
 extern crate rand;
