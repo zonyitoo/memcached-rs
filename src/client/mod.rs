@@ -15,7 +15,7 @@ use std::net::TcpStream;
 use std::ops::Deref;
 use std::path::Path;
 use std::rc::Rc;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use conhash::{ConsistentHash, Node};
 
@@ -346,7 +346,7 @@ impl MultiOperation for Client {
         let server = self.find_server_by_key(keys[0]);
         server.borrow_mut().proto.delete_multi(keys)
     }
-    fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<BTreeMap<Vec<u8>, (Vec<u8>, u32)>> {
+    fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>> {
         assert_eq!(self.servers.len(), 1);
         let server = self.find_server_by_key(keys[0]);
         server.borrow_mut().proto.get_multi(keys)

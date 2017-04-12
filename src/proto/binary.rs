@@ -7,7 +7,7 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::From;
 use std::error;
 use std::fmt;
@@ -855,7 +855,7 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
         }
     }
 
-    fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<BTreeMap<Vec<u8>, (Vec<u8>, u32)>> {
+    fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>> {
         for key in keys.iter() {
             let req_header = RequestHeader::from_payload(
                 Command::GetKeyQuietly,
@@ -873,7 +873,7 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
         }
         self.send_noop()?;
 
-        let mut result = BTreeMap::new();
+        let mut result = HashMap::with_capacity(keys.len());
         loop {
             let resp = ResponsePacket::read_from(&mut self.stream)?;
             match resp.header.status {
@@ -1732,7 +1732,7 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
 #[cfg(test)]
 mod test {
     use proto::{BinaryProto, CasOperation, MultiOperation, NoReplyOperation, Operation, ServerOperation};
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashMap};
     use std::net::TcpStream;
 
     use bufstream::BufStream;
