@@ -855,6 +855,57 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
         }
     }
 
+    fn increment_multi<'a>(&mut self, kv: HashMap<&'a [u8], (u64, u64, u32)>) -> MemCachedResult<HashMap<&'a [u8], u64>> {
+        let opaques: MemCachedResult<HashMap<_, _>> = kv.into_iter().map(|(key, (amount, initial, expiration))| {
+            let opaque = random::<u32>();
+            let mut extra = [0u8; 20];
+            {
+                let mut extra_buf = Cursor::new(&mut extra[..]);
+                try!(extra_buf.write_u64::<BigEndian>(amount));
+                try!(extra_buf.write_u64::<BigEndian>(initial));
+                try!(extra_buf.write_u32::<BigEndian>(expiration));
+            }
+
+            let req_header = RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, 0,
+                                                         key, &extra, &[]);
+            let req_packet = RequestPacketRef::new(
+                                    &req_header,
+                                    &extra,
+                                    key,
+                                    &[]);
+
+            try!(req_packet.write_to(&mut self.stream));
+            Ok((opaque, key))
+        }).collect();
+
+        let opaques = try!(opaques);
+
+        try!(self.send_noop());
+        try!(self.stream.flush());
+
+        let mut results = HashMap::with_capacity(opaques.len());
+        loop {
+            let resp = try!(ResponsePacket::read_from(&mut self.stream));
+            match resp.header.status {
+                Status::NoError => {},
+                _ => return Err(From::from(Error::from_status(resp.header.status, None))),
+            }
+
+            if resp.header.command == Command::Noop {
+                return Ok(results);
+            }
+
+            match opaques.get(&resp.header.opaque) {
+                Some(&key) => {
+                    let mut bufr = BufReader::new(&resp.value[..]);
+                    let val = try!(bufr.read_u64::<BigEndian>());
+                    results.insert(key, val);
+                }
+                None => {}
+            }
+        }
+    }
+
     fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>> {
         for key in keys.iter() {
             let req_header = RequestHeader::from_payload(
@@ -1925,12 +1976,14 @@ mod test {
     }
 
     #[test]
-    fn test_set_get_delete_muti() {
+    fn test_set_get_delete_incr_muti() {
         let mut client = get_client();
 
         let mut data = BTreeMap::new();
         data.insert(&b"test:multi_hello1"[..], (&b"world1"[..], 0xdeadbeef, 120));
         data.insert(&b"test:multi_hello2"[..], (&b"world2"[..], 0xdeadbeef, 120));
+        data.insert(&b"test:multi_num1"[..], (&b"100"[..], 0xdeadbeef, 120));
+        data.insert(&b"test:multi_num2"[..], (&b"200"[..], 0xdeadbeef, 120));
         data.insert(&b"test:multi_lastone"[..], (&b"last!"[..], 0xdeadbeef, 120));
 
         let set_resp = client.set_multi(data);
@@ -1974,6 +2027,33 @@ mod test {
             get_resp_map.get(&b"test:multi_lastone".to_vec()),
             Some(&(b"last!".to_vec(), 0xdeadbeef))
         );
+
+        assert_eq!(get_resp_map.get(&b"test:multi_hello1".to_vec()),
+                   None);
+        assert_eq!(get_resp_map.get(&b"test:multi_hello2".to_vec()),
+                   None);
+        assert_eq!(get_resp_map.get(&b"test:multi_lastone".to_vec()),
+                   Some(&(b"last!".to_vec(), 0xdeadbeef)));
+
+        let mut data = HashMap::new();
+        data.insert(&b"test:multi_num1"[..], (10, 50, 120));
+        data.insert(&b"test:multi_num2"[..], (20, 50, 120));
+        data.insert(&b"test:multi_num3"[..], (30, 50, 120));
+        let incr_resp = client.increment_multi(data);
+        assert!(incr_resp.is_ok());
+
+        let get_resp = client.get_multi(&[b"test:multi_num1",
+                                          b"test:multi_num2",
+                                          b"test:multi_num3"]);
+        assert!(get_resp.is_ok());
+
+        let get_resp_map = get_resp.as_ref().unwrap();
+        assert_eq!(get_resp_map.get(&b"test:multi_num1".to_vec()),
+                   Some(&(b"110".to_vec(), 0xdeadbeef)));
+        assert_eq!(get_resp_map.get(&b"test:multi_num2".to_vec()),
+                   Some(&(b"220".to_vec(), 0xdeadbeef)));
+        assert_eq!(get_resp_map.get(&b"test:multi_num3".to_vec()),
+                   Some(&(b"50".to_vec(), 0x0)));
 
         let del_resp = client.delete_multi(&[b"lastone", b"not_exists!!!!"]);
         assert!(del_resp.is_ok());

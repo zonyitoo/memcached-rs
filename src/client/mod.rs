@@ -346,6 +346,11 @@ impl MultiOperation for Client {
         let server = self.find_server_by_key(keys[0]);
         server.borrow_mut().proto.delete_multi(keys)
     }
+    fn increment_multi<'a>(&mut self, kv: HashMap<&'a [u8], (u64, u64, u32)>) -> MemCachedResult<HashMap<&'a [u8], u64>> {
+        assert_eq!(self.servers.len(), 1);
+        let server = self.find_server_by_key(kv.keys().next().unwrap());
+        server.borrow_mut().proto.increment_multi(kv)
+    }
     fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>> {
         assert_eq!(self.servers.len(), 1);
         let server = self.find_server_by_key(keys[0]);
