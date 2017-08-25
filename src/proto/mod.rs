@@ -46,11 +46,9 @@ impl error::Error for Error {
     fn description(&self) -> &str {
         match self {
             &Error::BinaryProtoError(ref err) => {
-                use std::error::Error;
                 err.description()
             },
             &Error::IoError(ref err) => {
-                use std::error::Error;
                 err.description()
             },
             &Error::OtherError { desc, .. } => desc,
@@ -58,7 +56,7 @@ impl error::Error for Error {
     }
 }
 
-impl fmt::Display for Error {
+impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Error::BinaryProtoError(ref err) => err.fmt(f),
