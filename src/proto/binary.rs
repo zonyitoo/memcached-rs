@@ -43,8 +43,14 @@ impl Error {
         }
     }
 
+    /// Get error description
     pub fn detail(&self) -> Option<String> {
         self.detail.clone()
+    }
+
+    /// Get status code
+    pub fn status(&self) -> Status {
+        self.status
     }
 }
 
