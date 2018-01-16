@@ -7,19 +7,19 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::io::{BufRead, Cursor, BufReader, Write};
-use std::string::String;
-use std::str;
 use std::collections::BTreeMap;
 use std::convert::From;
 use std::error;
 use std::fmt;
+use std::io::{BufRead, BufReader, Cursor, Write};
+use std::str;
+use std::string::String;
 
-use byteorder::{WriteBytesExt, ReadBytesExt, BigEndian};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation, CasOperation, AuthOperation};
-use proto::{self, MemCachedResult, AuthResponse};
-use proto::binarydef::{RequestHeader, RequestPacket, RequestPacketRef, ResponsePacket, Command, DataType};
+use proto::{self, AuthResponse, MemCachedResult};
+use proto::{AuthOperation, CasOperation, MultiOperation, NoReplyOperation, Operation, ServerOperation};
+use proto::binarydef::{Command, DataType, RequestHeader, RequestPacket, RequestPacketRef, ResponsePacket};
 
 use semver::Version;
 
@@ -56,10 +56,10 @@ impl Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "{}", self.desc));
+        write!(f, "{}", self.desc)?;
         match self.detail {
             Some(ref s) => write!(f, " ({})", s),
-            None => Ok(())
+            None => Ok(()),
         }
     }
 }
@@ -82,22 +82,25 @@ pub struct BinaryProto<T: BufRead + Write + Send> {
 
 impl<T: BufRead + Write + Send> BinaryProto<T> {
     pub fn new(stream: T) -> BinaryProto<T> {
-        BinaryProto {
-            stream: stream,
-        }
+        BinaryProto { stream: stream }
     }
 
     fn send_noop(&mut self) -> MemCachedResult<u32> {
         let opaque = random::<u32>();
         debug!("Sending NOOP");
         let req_packet = RequestPacket::new(
-                                Command::Noop, DataType::RawBytes, 0, opaque, 0,
-                                Vec::new(),
-                                Vec::new(),
-                                Vec::new());
+            Command::Noop,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        );
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
         Ok(opaque)
     }
@@ -106,30 +109,43 @@ impl<T: BufRead + Write + Send> BinaryProto<T> {
 impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Set key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value, flags, expiration);
+        debug!(
+            "Set key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value,
+            flags,
+            expiration
+        );
         let mut extra = [0u8; 8];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(flags));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(flags)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Set, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                value);
+        let req_header = RequestHeader::from_payload(
+            Command::Set,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -140,30 +156,43 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
 
     fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Add key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value, flags, expiration);
+        debug!(
+            "Add key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value,
+            flags,
+            expiration
+        );
         let mut extra = [0u8; 8];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(flags));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(flags)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Add, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                value);
+        let req_header = RequestHeader::from_payload(
+            Command::Add,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -174,22 +203,33 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
 
     fn delete(&mut self, key: &[u8]) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Delete key: {:?} {:?}", key, str::from_utf8(key).unwrap_or("<not-utf8-key>"));
-        let req_header = RequestHeader::from_payload(Command::Delete, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &[], &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                &[]);
+        debug!(
+            "Delete key: {:?} {:?}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>")
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::Delete,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -200,30 +240,43 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
 
     fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Replace key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value, flags, expiration);
+        debug!(
+            "Replace key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value,
+            flags,
+            expiration
+        );
         let mut extra = [0u8; 8];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(flags));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(flags)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Replace, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                value);
+        let req_header = RequestHeader::from_payload(
+            Command::Replace,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -234,161 +287,220 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
 
     fn get(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32)> {
         let opaque = random::<u32>();
-        debug!("Get key: {:?} {:?}", key, str::from_utf8(key).unwrap_or("<not-utf8-key>"));
-        let req_header = RequestHeader::from_payload(Command::Get, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &[], &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                &[]);
+        debug!(
+            "Get key: {:?} {:?}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>")
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::Get,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
             Status::NoError => {
                 let mut extrabufr = BufReader::new(&resp.extra[..]);
-                let flags = try!(extrabufr.read_u32::<BigEndian>());
+                let flags = extrabufr.read_u32::<BigEndian>()?;
 
                 Ok((resp.value, flags))
-            },
+            }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
     fn getk(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, Vec<u8>, u32)> {
         let opaque = random::<u32>();
-        debug!("GetK key: {:?} {:?}", key, str::from_utf8(key).unwrap_or("<not-utf8-key>"));
-        let req_header = RequestHeader::from_payload(Command::GetKey, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &[], &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                &[]);
+        debug!(
+            "GetK key: {:?} {:?}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>")
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::GetKey,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
             Status::NoError => {
                 let mut extrabufr = BufReader::new(&resp.extra[..]);
-                let flags = try!(extrabufr.read_u32::<BigEndian>());
+                let flags = extrabufr.read_u32::<BigEndian>()?;
 
                 Ok((resp.key, resp.value, flags))
-            },
+            }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
     fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
-        debug!("Increment key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), amount, initial, expiration);
+        debug!(
+            "Increment key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            amount,
+            initial,
+            expiration
+        );
         let mut extra = [0u8; 20];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u64::<BigEndian>(amount));
-            try!(extra_buf.write_u64::<BigEndian>(initial));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u64::<BigEndian>(amount)?;
+            extra_buf.write_u64::<BigEndian>(initial)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Increment,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
             Status::NoError => {
                 let mut bufr = BufReader::new(&resp.value[..]);
-                Ok(try!(bufr.read_u64::<BigEndian>()))
-            },
+                Ok(bufr.read_u64::<BigEndian>()?)
+            }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
     fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
-        debug!("Decrement key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), amount, initial, expiration);
+        debug!(
+            "Decrement key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            amount,
+            initial,
+            expiration
+        );
         let mut extra = [0u8; 20];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u64::<BigEndian>(amount));
-            try!(extra_buf.write_u64::<BigEndian>(initial));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u64::<BigEndian>(amount)?;
+            extra_buf.write_u64::<BigEndian>(initial)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Decrement, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Decrement,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
             Status::NoError => {
                 let mut bufr = BufReader::new(&resp.value[..]);
-                Ok(try!(bufr.read_u64::<BigEndian>()))
-            },
+                Ok(bufr.read_u64::<BigEndian>()?)
+            }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
     fn append(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Append key: {:?} {:?}, value: {:?}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value);
-        let req_header = RequestHeader::from_payload(Command::Append, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &[], value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                value);
+        debug!(
+            "Append key: {:?} {:?}, value: {:?}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::Append,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -399,23 +511,34 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
 
     fn prepend(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Prepend key: {:?} {:?}, value: {:?}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value);
-        let req_header = RequestHeader::from_payload(Command::Prepend, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &[], value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                value);
+        debug!(
+            "Prepend key: {:?} {:?}, value: {:?}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::Prepend,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -426,29 +549,40 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
 
     fn touch(&mut self, key: &[u8], expiration: u32) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Touch key: {:?} {:?}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), expiration);
+        debug!(
+            "Touch key: {:?} {:?}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            expiration
+        );
         let mut extra = [0u8; 4];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Touch, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Touch,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -462,21 +596,28 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
     fn quit(&mut self) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!("Quit");
-        let req_header = RequestHeader::from_payload(Command::Quit, DataType::RawBytes, 0, opaque, 0,
-                                                     &[], &[], &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                &[],
-                                &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Quit,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            &[],
+            &[],
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], &[], &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -491,24 +632,31 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
         let mut extra = [0u8; 4];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Flush, DataType::RawBytes, 0, opaque, 0,
-                                                     &[], &extra, &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                &[],
-                                &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Flush,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            &[],
+            &extra,
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, &[], &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -519,11 +667,14 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
 
     fn noop(&mut self) -> MemCachedResult<()> {
         debug!("Noop");
-        let opaque = try!(self.send_noop());
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let opaque = self.send_noop()?;
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -536,19 +687,18 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
         let opaque = random::<u32>();
         debug!("Version");
         let req_header = RequestHeader::new(Command::Version, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                &[],
-                                &[]);
+        let req_packet = RequestPacketRef::new(&req_header, &[], &[], &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -556,20 +706,24 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
                 let val = resp.value;
                 let verstr = match str::from_utf8(&val[..]) {
                     Ok(vs) => vs,
-                    Err(..) => return Err(proto::Error::OtherError {
-                        desc: "Response is not a string",
-                        detail: None,
-                    }),
+                    Err(..) => {
+                        return Err(proto::Error::OtherError {
+                            desc: "Response is not a string",
+                            detail: None,
+                        })
+                    }
                 };
 
                 Ok(match Version::parse(verstr) {
                     Ok(v) => v,
-                    Err(err) => return Err(proto::Error::OtherError {
-                        desc: "Unrecognized version string",
-                        detail: Some(err.to_string()),
-                    }),
+                    Err(err) => {
+                        return Err(proto::Error::OtherError {
+                            desc: "Unrecognized version string",
+                            detail: Some(err.to_string()),
+                        })
+                    }
                 })
-            },
+            }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
@@ -578,24 +732,23 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
         let opaque = random::<u32>();
         debug!("Stat");
         let req_header = RequestHeader::new(Command::Stat, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                &[],
-                                &[]);
+        let req_packet = RequestPacketRef::new(&req_header, &[], &[], &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
         let mut result = BTreeMap::new();
         loop {
-            let resp = try!(ResponsePacket::read_from(&mut self.stream));
+            let resp = ResponsePacket::read_from(&mut self.stream)?;
             if resp.header.opaque != opaque {
-                debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
+                debug!(
+                    "Expecting opaque: {} but got {}, trying again ...",
+                    opaque, resp.header.opaque
+                );
                 continue;
             }
             match resp.header.status {
-                Status::NoError => {},
+                Status::NoError => {}
                 _ => return Err(From::from(Error::from_status(resp.header.status, None))),
             }
 
@@ -605,18 +758,22 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
 
             let key = match String::from_utf8(resp.key) {
                 Ok(k) => k,
-                Err(..) => return Err(proto::Error::OtherError {
+                Err(..) => {
+                    return Err(proto::Error::OtherError {
                         desc: "Key is not a string",
                         detail: None,
-                    }),
+                    })
+                }
             };
 
             let val = match String::from_utf8(resp.value) {
                 Ok(k) => k,
-                Err(..) => return Err(proto::Error::OtherError {
+                Err(..) => {
+                    return Err(proto::Error::OtherError {
                         desc: "Value is not a string",
                         detail: None,
-                    }),
+                    })
+                }
             };
 
             result.insert(key, val);
@@ -632,55 +789,63 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
             let mut extra = [0u8; 8];
             {
                 let mut extra_buf = Cursor::new(&mut extra[..]);
-                try!(extra_buf.write_u32::<BigEndian>(flags));
-                try!(extra_buf.write_u32::<BigEndian>(expiration));
+                extra_buf.write_u32::<BigEndian>(flags)?;
+                extra_buf.write_u32::<BigEndian>(expiration)?;
             }
 
-            let req_header = RequestHeader::from_payload(Command::SetQuietly, DataType::RawBytes, 0, 0, 0,
-                                                         key, &extra, value);
-            let req_packet = RequestPacketRef::new(
-                                    &req_header,
-                                    &extra,
-                                    key,
-                                    value);
+            let req_header = RequestHeader::from_payload(
+                Command::SetQuietly,
+                DataType::RawBytes,
+                0,
+                0,
+                0,
+                key,
+                &extra,
+                value,
+            );
+            let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
-            try!(req_packet.write_to(&mut self.stream));
+            req_packet.write_to(&mut self.stream)?;
         }
-        try!(self.send_noop());
+        self.send_noop()?;
 
         loop {
-            let resp = try!(ResponsePacket::read_from(&mut self.stream));
+            let resp = ResponsePacket::read_from(&mut self.stream)?;
 
             match resp.header.status {
-                Status::NoError => {},
+                Status::NoError => {}
                 _ => return Err(From::from(Error::from_status(resp.header.status, None))),
             }
 
             if resp.header.command == Command::Noop {
-                return Ok(())
+                return Ok(());
             }
         }
     }
 
     fn delete_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<()> {
         for key in keys.iter() {
-            let req_header = RequestHeader::from_payload(Command::DeleteQuietly, DataType::RawBytes, 0, 0, 0,
-                                                         *key, &[], &[]);
-            let req_packet = RequestPacketRef::new(
-                                    &req_header,
-                                    &[],
-                                    *key,
-                                    &[]);
+            let req_header = RequestHeader::from_payload(
+                Command::DeleteQuietly,
+                DataType::RawBytes,
+                0,
+                0,
+                0,
+                *key,
+                &[],
+                &[],
+            );
+            let req_packet = RequestPacketRef::new(&req_header, &[], *key, &[]);
 
-            try!(req_packet.write_to(&mut self.stream));
+            req_packet.write_to(&mut self.stream)?;
         }
-        try!(self.send_noop());
+        self.send_noop()?;
 
         loop {
-            let resp = try!(ResponsePacket::read_from(&mut self.stream));
+            let resp = ResponsePacket::read_from(&mut self.stream)?;
 
             match resp.header.status {
-                Status::NoError | Status::KeyNotFound => {},
+                Status::NoError | Status::KeyNotFound => {}
                 _ => return Err(From::from(Error::from_status(resp.header.status, None))),
             }
 
@@ -691,25 +856,28 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
     }
 
     fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<BTreeMap<Vec<u8>, (Vec<u8>, u32)>> {
-
         for key in keys.iter() {
-            let req_header = RequestHeader::from_payload(Command::GetKeyQuietly, DataType::RawBytes, 0, 0, 0,
-                                                         *key, &[], &[]);
-            let req_packet = RequestPacketRef::new(
-                                    &req_header,
-                                    &[],
-                                    *key,
-                                    &[]);
+            let req_header = RequestHeader::from_payload(
+                Command::GetKeyQuietly,
+                DataType::RawBytes,
+                0,
+                0,
+                0,
+                *key,
+                &[],
+                &[],
+            );
+            let req_packet = RequestPacketRef::new(&req_header, &[], *key, &[]);
 
-            try!(req_packet.write_to(&mut self.stream));
+            req_packet.write_to(&mut self.stream)?;
         }
-        try!(self.send_noop());
+        self.send_noop()?;
 
         let mut result = BTreeMap::new();
         loop {
-            let resp = try!(ResponsePacket::read_from(&mut self.stream));
+            let resp = ResponsePacket::read_from(&mut self.stream)?;
             match resp.header.status {
-                Status::NoError => {},
+                Status::NoError => {}
                 _ => return Err(From::from(Error::from_status(resp.header.status, None))),
             }
 
@@ -718,7 +886,7 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
             }
 
             let mut extrabufr = BufReader::new(&resp.extra[..]);
-            let flags = try!(extrabufr.read_u32::<BigEndian>());
+            let flags = extrabufr.read_u32::<BigEndian>()?;
 
             result.insert(resp.key, (resp.value, flags));
         }
@@ -728,181 +896,254 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
 impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
     fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Set noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value, flags, expiration);
+        debug!(
+            "Set noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value,
+            flags,
+            expiration
+        );
         let mut extra = [0u8; 8];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(flags));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(flags)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::SetQuietly, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                value);
+        let req_header = RequestHeader::from_payload(
+            Command::SetQuietly,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
         Ok(())
     }
 
     fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Add noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value, flags, expiration);
+        debug!(
+            "Add noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value,
+            flags,
+            expiration
+        );
         let mut extra = [0u8; 8];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(flags));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(flags)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::AddQuietly, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                value);
+        let req_header = RequestHeader::from_payload(
+            Command::AddQuietly,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
         Ok(())
     }
 
     fn delete_noreply(&mut self, key: &[u8]) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Delete noreply key: {:?} {:?}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"));
-        let req_header = RequestHeader::from_payload(Command::DeleteQuietly, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &[], &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                &[]);
+        debug!(
+            "Delete noreply key: {:?} {:?}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>")
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::DeleteQuietly,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
         Ok(())
     }
 
     fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Replace noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value, flags, expiration);
+        debug!(
+            "Replace noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value,
+            flags,
+            expiration
+        );
         let mut extra = [0u8; 8];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(flags));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(flags)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::ReplaceQuietly, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                value);
+        let req_header = RequestHeader::from_payload(
+            Command::ReplaceQuietly,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
         Ok(())
     }
 
     fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Increment noreply key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), amount, initial, expiration);
+        debug!(
+            "Increment noreply key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            amount,
+            initial,
+            expiration
+        );
         let mut extra = [0u8; 20];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u64::<BigEndian>(amount));
-            try!(extra_buf.write_u64::<BigEndian>(initial));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u64::<BigEndian>(amount)?;
+            extra_buf.write_u64::<BigEndian>(initial)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::IncrementQuietly, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::IncrementQuietly,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
         Ok(())
     }
 
     fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Decrement noreply key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), amount, initial, expiration);
+        debug!(
+            "Decrement noreply key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            amount,
+            initial,
+            expiration
+        );
         let mut extra = [0u8; 20];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u64::<BigEndian>(amount));
-            try!(extra_buf.write_u64::<BigEndian>(initial));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u64::<BigEndian>(amount)?;
+            extra_buf.write_u64::<BigEndian>(initial)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::DecrementQuietly, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::DecrementQuietly,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
         Ok(())
     }
 
     fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Append noreply key: {:?} {:?}, value: {:?}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value);
-        let req_header = RequestHeader::from_payload(Command::AppendQuietly, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &[], value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                value);
+        debug!(
+            "Append noreply key: {:?} {:?}, value: {:?}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::AppendQuietly,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
         Ok(())
     }
 
     fn prepend_noreply(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
         let opaque = random::<u32>();
-        debug!("Prepend noreply key: {:?} {:?}, value: {:?}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value);
-        let req_header = RequestHeader::from_payload(Command::PrependQuietly, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &[], value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                value);
+        debug!(
+            "Prepend noreply key: {:?} {:?}, value: {:?}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::PrependQuietly,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
         Ok(())
     }
@@ -911,30 +1152,44 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
 impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
     fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
-        debug!("Set cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}, cas: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value, flags, expiration, cas);
+        debug!(
+            "Set cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}, cas: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value,
+            flags,
+            expiration,
+            cas
+        );
         let mut extra = [0u8; 8];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(flags));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(flags)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Set, DataType::RawBytes, 0, opaque, cas,
-                                                     key, &extra, value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                value);
+        let req_header = RequestHeader::from_payload(
+            Command::Set,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &extra,
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -945,30 +1200,43 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
 
     fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
-        debug!("Add cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value, flags, expiration);
+        debug!(
+            "Add cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value,
+            flags,
+            expiration
+        );
         let mut extra = [0u8; 8];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(flags));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(flags)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Add, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &extra, value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                value);
+        let req_header = RequestHeader::from_payload(
+            Command::Add,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -979,30 +1247,44 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
 
     fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
-        debug!("Replace cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}, cas: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value, flags, expiration, cas);
+        debug!(
+            "Replace cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}, cas: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value,
+            flags,
+            expiration,
+            cas
+        );
         let mut extra = [0u8; 8];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(flags));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(flags)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Replace, DataType::RawBytes, 0, opaque, cas,
-                                                     key, &extra, value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                value);
+        let req_header = RequestHeader::from_payload(
+            Command::Replace,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &extra,
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -1013,163 +1295,237 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
 
     fn get_cas(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32, u64)> {
         let opaque = random::<u32>();
-        debug!("Get cas key: {:?} {:?}", key, str::from_utf8(key).unwrap_or("<not-utf8-key>"));
-        let req_header = RequestHeader::from_payload(Command::Get, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &[], &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                &[]);
+        debug!(
+            "Get cas key: {:?} {:?}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>")
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::Get,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
             Status::NoError => {
                 let mut extrabufr = BufReader::new(&resp.extra[..]);
-                let flags = try!(extrabufr.read_u32::<BigEndian>());
+                let flags = extrabufr.read_u32::<BigEndian>()?;
 
                 Ok((resp.value, flags, resp.header.cas))
-            },
+            }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
     fn getk_cas(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, Vec<u8>, u32, u64)> {
         let opaque = random::<u32>();
-        debug!("GetK cas key: {:?} {:?}", key, str::from_utf8(key).unwrap_or("<not-utf8-key>"));
-        let req_header = RequestHeader::from_payload(Command::GetKey, DataType::RawBytes, 0, opaque, 0,
-                                                     key, &[], &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                &[]);
+        debug!(
+            "GetK cas key: {:?} {:?}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>")
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::GetKey,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
             Status::NoError => {
                 let mut extrabufr = BufReader::new(&resp.extra[..]);
-                let flags = try!(extrabufr.read_u32::<BigEndian>());
+                let flags = extrabufr.read_u32::<BigEndian>()?;
 
                 Ok((resp.key, resp.value, flags, resp.header.cas))
-            },
+            }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
-    fn increment_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
-            -> MemCachedResult<(u64, u64)> {
+    fn increment_cas(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+        cas: u64,
+    ) -> MemCachedResult<(u64, u64)> {
         let opaque = random::<u32>();
-        debug!("Increment cas key: {:?} {:?}, amount: {}, initial: {}, expiration: {}, cas: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), amount, initial, expiration, cas);
+        debug!(
+            "Increment cas key: {:?} {:?}, amount: {}, initial: {}, expiration: {}, cas: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            amount,
+            initial,
+            expiration,
+            cas
+        );
         let mut extra = [0u8; 20];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u64::<BigEndian>(amount));
-            try!(extra_buf.write_u64::<BigEndian>(initial));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u64::<BigEndian>(amount)?;
+            extra_buf.write_u64::<BigEndian>(initial)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, cas,
-                                                     key, &extra, &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Increment,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &extra,
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
             Status::NoError => {
                 let mut bufr = BufReader::new(&resp.value[..]);
-                Ok((try!(bufr.read_u64::<BigEndian>()), resp.header.cas))
-            },
+                Ok((bufr.read_u64::<BigEndian>()?, resp.header.cas))
+            }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
-    fn decrement_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
-            -> MemCachedResult<(u64, u64)> {
+    fn decrement_cas(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+        cas: u64,
+    ) -> MemCachedResult<(u64, u64)> {
         let opaque = random::<u32>();
-        debug!("Decrement cas key: {:?} {:?}, amount: {}, initial: {}, expiration: {}, cas: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), amount, initial, expiration, cas);
+        debug!(
+            "Decrement cas key: {:?} {:?}, amount: {}, initial: {}, expiration: {}, cas: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            amount,
+            initial,
+            expiration,
+            cas
+        );
         let mut extra = [0u8; 20];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u64::<BigEndian>(amount));
-            try!(extra_buf.write_u64::<BigEndian>(initial));
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u64::<BigEndian>(amount)?;
+            extra_buf.write_u64::<BigEndian>(initial)?;
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Decrement, DataType::RawBytes, 0, opaque, cas,
-                                                     key, &extra, &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Decrement,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &extra,
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
             Status::NoError => {
                 let mut bufr = BufReader::new(&resp.value[..]);
-                Ok((try!(bufr.read_u64::<BigEndian>()), resp.header.cas))
-            },
+                Ok((bufr.read_u64::<BigEndian>()?, resp.header.cas))
+            }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
     fn append_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
-        debug!("Append cas key: {:?} {:?}, value: {:?}, cas: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value, cas);
-        let req_header = RequestHeader::from_payload(Command::Append, DataType::RawBytes, 0, opaque, cas,
-                                                     key, &[], value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                value);
+        debug!(
+            "Append cas key: {:?} {:?}, value: {:?}, cas: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value,
+            cas
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::Append,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &[],
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -1180,23 +1536,35 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
 
     fn prepend_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
-        debug!("Prepend cas key: {:?} {:?}, value: {:?}, cas: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), value, cas);
-        let req_header = RequestHeader::from_payload(Command::Prepend, DataType::RawBytes, 0, opaque, cas,
-                                                     key, &[], value);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &[],
-                                key,
-                                value);
+        debug!(
+            "Prepend cas key: {:?} {:?}, value: {:?}, cas: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            value,
+            cas
+        );
+        let req_header = RequestHeader::from_payload(
+            Command::Prepend,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &[],
+            value,
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -1207,29 +1575,41 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
 
     fn touch_cas(&mut self, key: &[u8], expiration: u32, cas: u64) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
-        debug!("Touch cas key: {:?} {:?}, expiration: {:?}, cas: {}",
-               key, str::from_utf8(key).unwrap_or("<not-utf8-key>"), expiration, cas);
+        debug!(
+            "Touch cas key: {:?} {:?}, expiration: {:?}, cas: {}",
+            key,
+            str::from_utf8(key).unwrap_or("<not-utf8-key>"),
+            expiration,
+            cas
+        );
         let mut extra = [0u8; 4];
         {
             let mut extra_buf = Cursor::new(&mut extra[..]);
-            try!(extra_buf.write_u32::<BigEndian>(expiration));
+            extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(Command::Touch, DataType::RawBytes, 0, opaque, cas,
-                                                     key, &extra, &[]);
-        let req_packet = RequestPacketRef::new(
-                                &req_header,
-                                &extra,
-                                key,
-                                &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Touch,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &extra,
+            &[],
+        );
+        let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -1243,48 +1623,67 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
     fn list_mechanisms(&mut self) -> MemCachedResult<Vec<String>> {
         let opaque = random::<u32>();
         debug!("List mechanisms");
-        let req_header = RequestHeader::new(Command::SaslListMechanisms, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
+        let req_header = RequestHeader::new(
+            Command::SaslListMechanisms,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            0,
+            0,
+            0,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], &[], &[]);
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
-            Status::NoError => {},
+            Status::NoError => {}
             _ => return Err(From::from(Error::from_status(resp.header.status, None))),
         }
 
         match str::from_utf8(&resp.value[..]) {
-            Ok(s) => {
-                Ok(s.split(' ').map(|mech| mech.to_string()).collect())
-            },
-            Err(..) => {
-                Err(proto::Error::OtherError {
-                        desc: "Mechanism decode error",
-                        detail: None,
-                    })
-            }
+            Ok(s) => Ok(s.split(' ').map(|mech| mech.to_string()).collect()),
+            Err(..) => Err(proto::Error::OtherError {
+                desc: "Mechanism decode error",
+                detail: None,
+            }),
         }
     }
 
     fn auth_start(&mut self, mech: &str, init: &[u8]) -> MemCachedResult<AuthResponse> {
         let opaque = random::<u32>();
         debug!("Auth start, mechanism: {:?}, init: {:?}", mech, init);
-        let req_header = RequestHeader::from_payload(Command::SaslAuthenticate, DataType::RawBytes, 0, opaque, 0,
-                                                     mech.as_bytes(), &[], init);
+        let req_header = RequestHeader::from_payload(
+            Command::SaslAuthenticate,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            mech.as_bytes(),
+            &[],
+            init,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], mech.as_bytes(), init);
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -1298,16 +1697,27 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
     fn auth_continue(&mut self, mech: &str, data: &[u8]) -> MemCachedResult<AuthResponse> {
         let opaque = random::<u32>();
         debug!("Auth continue, mechanism: {:?}, data: {:?}", mech, data);
-        let req_header = RequestHeader::from_payload(Command::SaslStep, DataType::RawBytes, 0, opaque, 0,
-                                                     mech.as_bytes(), &[], data);
+        let req_header = RequestHeader::from_payload(
+            Command::SaslStep,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            mech.as_bytes(),
+            &[],
+            data,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], mech.as_bytes(), data);
-        try!(req_packet.write_to(&mut self.stream));
-        try!(self.stream.flush());
+        req_packet.write_to(&mut self.stream)?;
+        self.stream.flush()?;
 
-        let mut resp = try!(ResponsePacket::read_from(&mut self.stream));
+        let mut resp = ResponsePacket::read_from(&mut self.stream)?;
         while resp.header.opaque != opaque {
-            debug!("Expecting opaque: {} but got {}, trying again ...", opaque, resp.header.opaque);
-            resp = try!(ResponsePacket::read_from(&mut self.stream));
+            debug!(
+                "Expecting opaque: {} but got {}, trying again ...",
+                opaque, resp.header.opaque
+            );
+            resp = ResponsePacket::read_from(&mut self.stream)?;
         }
 
         match resp.header.status {
@@ -1321,10 +1731,9 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
 
 #[cfg(test)]
 mod test {
-    use std::net::TcpStream;
+    use proto::{BinaryProto, CasOperation, MultiOperation, NoReplyOperation, Operation, ServerOperation};
     use std::collections::BTreeMap;
-    use proto::{Operation, MultiOperation, ServerOperation, NoReplyOperation,
-                CasOperation, BinaryProto};
+    use std::net::TcpStream;
 
     use bufstream::BufStream;
 
@@ -1474,13 +1883,19 @@ mod test {
             assert!(app_resp.is_ok());
             let get_resp = client.get(b"test:append_key");
             assert!(get_resp.is_ok());
-            assert_eq!(get_resp.unwrap(), (b"just_addappended".to_vec(), 0xdeadbeef));
+            assert_eq!(
+                get_resp.unwrap(),
+                (b"just_addappended".to_vec(), 0xdeadbeef)
+            );
 
             let pre_resp = client.prepend(b"test:append_key", b"prepended");
             assert!(pre_resp.is_ok());
             let get_resp = client.get(b"test:append_key");
             assert!(get_resp.is_ok());
-            assert_eq!(get_resp.unwrap(), (b"prependedjust_addappended".to_vec(), 0xdeadbeef));
+            assert_eq!(
+                get_resp.unwrap(),
+                (b"prependedjust_addappended".to_vec(), 0xdeadbeef)
+            );
         }
 
         assert!(client.delete(b"test:append_key").is_ok());
@@ -1521,38 +1936,46 @@ mod test {
         let set_resp = client.set_multi(data);
         assert!(set_resp.is_ok());
 
-        let get_resp = client.get_multi(&[b"test:multi_hello1",
-                                          b"test:multi_hello2",
-                                          b"test:multi_lastone"]);
+        let get_resp = client.get_multi(&[
+            b"test:multi_hello1",
+            b"test:multi_hello2",
+            b"test:multi_lastone",
+        ]);
         assert!(get_resp.is_ok());
 
         let get_resp_map = get_resp.as_ref().unwrap();
-        assert_eq!(get_resp_map.get(&b"test:multi_hello1".to_vec()),
-                   Some(&(b"world1".to_vec(), 0xdeadbeef)));
-        assert_eq!(get_resp_map.get(&b"test:multi_hello2".to_vec()),
-                   Some(&(b"world2".to_vec(), 0xdeadbeef)));
-        assert_eq!(get_resp_map.get(&b"test:multi_lastone".to_vec()),
-                   Some(&(b"last!".to_vec(), 0xdeadbeef)));
+        assert_eq!(
+            get_resp_map.get(&b"test:multi_hello1".to_vec()),
+            Some(&(b"world1".to_vec(), 0xdeadbeef))
+        );
+        assert_eq!(
+            get_resp_map.get(&b"test:multi_hello2".to_vec()),
+            Some(&(b"world2".to_vec(), 0xdeadbeef))
+        );
+        assert_eq!(
+            get_resp_map.get(&b"test:multi_lastone".to_vec()),
+            Some(&(b"last!".to_vec(), 0xdeadbeef))
+        );
 
-        let del_resp = client.delete_multi(&[b"test:multi_hello1",
-                                             b"test:multi_hello2"]);
+        let del_resp = client.delete_multi(&[b"test:multi_hello1", b"test:multi_hello2"]);
         assert!(del_resp.is_ok());
 
-        let get_resp = client.get_multi(&[b"test:multi_hello1",
-                                          b"test:multi_hello2",
-                                          b"test:multi_lastone"]);
+        let get_resp = client.get_multi(&[
+            b"test:multi_hello1",
+            b"test:multi_hello2",
+            b"test:multi_lastone",
+        ]);
         assert!(get_resp.is_ok());
 
         let get_resp_map = get_resp.as_ref().unwrap();
-        assert_eq!(get_resp_map.get(&b"test:multi_hello1".to_vec()),
-                   None);
-        assert_eq!(get_resp_map.get(&b"test:multi_hello2".to_vec()),
-                   None);
-        assert_eq!(get_resp_map.get(&b"test:multi_lastone".to_vec()),
-                   Some(&(b"last!".to_vec(), 0xdeadbeef)));
+        assert_eq!(get_resp_map.get(&b"test:multi_hello1".to_vec()), None);
+        assert_eq!(get_resp_map.get(&b"test:multi_hello2".to_vec()), None);
+        assert_eq!(
+            get_resp_map.get(&b"test:multi_lastone".to_vec()),
+            Some(&(b"last!".to_vec(), 0xdeadbeef))
+        );
 
-        let del_resp = client.delete_multi(&[b"lastone",
-                                             b"not_exists!!!!"]);
+        let del_resp = client.delete_multi(&[b"lastone", b"not_exists!!!!"]);
         assert!(del_resp.is_ok());
     }
 

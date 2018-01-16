@@ -9,7 +9,7 @@
 
 //! Memcached version
 
-use std::fmt::{Display, Formatter, self};
+use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 
 /// Memcached version

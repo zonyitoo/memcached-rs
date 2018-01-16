@@ -9,12 +9,12 @@
 
 //! Memcached client
 
-use std::net::TcpStream;
-use std::io;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::io;
+use std::net::TcpStream;
 use std::ops::Deref;
 use std::path::Path;
+use std::rc::Rc;
 
 use conhash::{ConsistentHash, Node};
 
@@ -23,8 +23,8 @@ use bufstream::BufStream;
 #[cfg(unix)]
 use unix_socket::UnixStream;
 
-use proto::{Proto, Operation, NoReplyOperation, CasOperation};
-use proto::{MemCachedResult, self};
+use proto::{self, MemCachedResult};
+use proto::{CasOperation, NoReplyOperation, Operation, Proto};
 
 struct Server {
     pub proto: Box<Proto + Send>,
@@ -37,23 +37,21 @@ impl Server {
 
         Ok(Server {
             proto: match protocol {
-                proto::ProtoType::Binary => {
-                    match (split.next(), split.next()) {
-                        (Some("tcp"), Some(addr)) => {
-                            let stream = try!(TcpStream::connect(addr));
-                            Box::new(proto::BinaryProto::new(BufStream::new(stream))) as Box<Proto + Send>
-                        },
-                        #[cfg(unix)]
-                        (Some("unix"), Some(addr)) => {
-                            let stream = try!(UnixStream::connect(&Path::new(addr)));
-                            Box::new(proto::BinaryProto::new(BufStream::new(stream))) as Box<Proto + Send>
-                        },
-                        (Some(prot), _) => {
-                            panic!("Unsupported protocol: {}", prot);
-                        },
-                        _ => panic!("Malformed address"),
+                proto::ProtoType::Binary => match (split.next(), split.next()) {
+                    (Some("tcp"), Some(addr)) => {
+                        let stream = TcpStream::connect(addr)?;
+                        Box::new(proto::BinaryProto::new(BufStream::new(stream))) as Box<Proto + Send>
                     }
-                }
+                    #[cfg(unix)]
+                    (Some("unix"), Some(addr)) => {
+                        let stream = UnixStream::connect(&Path::new(addr))?;
+                        Box::new(proto::BinaryProto::new(BufStream::new(stream))) as Box<Proto + Send>
+                    }
+                    (Some(prot), _) => {
+                        panic!("Unsupported protocol: {}", prot);
+                    }
+                    _ => panic!("Malformed address"),
+                },
             },
             addr: addr.to_owned(),
         })
@@ -116,18 +114,15 @@ impl Client {
     ///
     /// `(address, weight)`.
     pub fn connect(svrs: &[(&str, usize)], p: proto::ProtoType) -> io::Result<Client> {
-
         assert!(!svrs.is_empty(), "Server list should not be empty");
 
         let mut servers = ConsistentHash::new();
         for &(addr, weight) in svrs.iter() {
-            let svr = try!(Server::connect(addr, p));
+            let svr = Server::connect(addr, p)?;
             servers.add(&ServerRef(Rc::new(RefCell::new(svr))), weight);
         }
 
-        Ok(Client {
-            servers: servers,
-        })
+        Ok(Client { servers: servers })
     }
 
     fn find_server_by_key<'a>(&'a mut self, key: &[u8]) -> &'a mut ServerRef {
@@ -153,7 +148,10 @@ impl Operation for Client {
 
     fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.replace(key, value, flags, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .replace(key, value, flags, expiration)
     }
 
     fn get(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32)> {
@@ -162,18 +160,24 @@ impl Operation for Client {
     }
 
     fn getk(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, Vec<u8>, u32)> {
-       let server = self.find_server_by_key(key);
-       server.borrow_mut().proto.getk(key)
+        let server = self.find_server_by_key(key);
+        server.borrow_mut().proto.getk(key)
     }
 
     fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.increment(key, amount, initial, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .increment(key, amount, initial, expiration)
     }
 
     fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.increment(key, amount, initial, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .increment(key, amount, initial, expiration)
     }
 
     fn append(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
@@ -195,12 +199,18 @@ impl Operation for Client {
 impl NoReplyOperation for Client {
     fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.set_noreply(key, value, flags, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .set_noreply(key, value, flags, expiration)
     }
 
     fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.add_noreply(key, value, flags, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .add_noreply(key, value, flags, expiration)
     }
 
     fn delete_noreply(&mut self, key: &[u8]) -> MemCachedResult<()> {
@@ -210,17 +220,26 @@ impl NoReplyOperation for Client {
 
     fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.replace_noreply(key, value, flags, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .replace_noreply(key, value, flags, expiration)
     }
 
     fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.increment_noreply(key, amount, initial, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .increment_noreply(key, amount, initial, expiration)
     }
 
     fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.decrement_noreply(key, amount, initial, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .decrement_noreply(key, amount, initial, expiration)
     }
 
     fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
@@ -237,17 +256,26 @@ impl NoReplyOperation for Client {
 impl CasOperation for Client {
     fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.set_cas(key, value, flags, expiration, cas)
+        server
+            .borrow_mut()
+            .proto
+            .set_cas(key, value, flags, expiration, cas)
     }
 
     fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.add_cas(key, value, flags, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .add_cas(key, value, flags, expiration)
     }
 
     fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.replace_cas(key, value, flags, expiration, cas)
+        server
+            .borrow_mut()
+            .proto
+            .replace_cas(key, value, flags, expiration, cas)
     }
 
     fn get_cas(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32, u64)> {
@@ -260,16 +288,34 @@ impl CasOperation for Client {
         server.borrow_mut().proto.getk_cas(key)
     }
 
-    fn increment_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
-            -> MemCachedResult<(u64, u64)> {
+    fn increment_cas(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+        cas: u64,
+    ) -> MemCachedResult<(u64, u64)> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.increment_cas(key, amount, initial, expiration, cas)
+        server
+            .borrow_mut()
+            .proto
+            .increment_cas(key, amount, initial, expiration, cas)
     }
 
-    fn decrement_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
-            -> MemCachedResult<(u64, u64)> {
+    fn decrement_cas(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+        cas: u64,
+    ) -> MemCachedResult<(u64, u64)> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.decrement_cas(key, amount, initial, expiration, cas)
+        server
+            .borrow_mut()
+            .proto
+            .decrement_cas(key, amount, initial, expiration, cas)
     }
 
     fn append_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> MemCachedResult<u64> {
@@ -290,10 +336,10 @@ impl CasOperation for Client {
 
 #[cfg(all(test, feature = "nightly"))]
 mod test {
-    use test::Bencher;
     use client::Client;
-    use proto::{Operation, NoReplyOperation, ProtoType};
+    use proto::{NoReplyOperation, Operation, ProtoType};
     use rand::random;
+    use test::Bencher;
 
     fn generate_data(len: usize) -> Vec<u8> {
         (0..len).map(|_| random()).collect()

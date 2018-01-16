@@ -9,19 +9,19 @@
 
 #![crate_type = "lib"]
 #![crate_name = "memcached"]
-
 #![cfg_attr(feature = "nightly", feature(test))]
 #[cfg(feature = "nightly")]
 extern crate test;
 
-#[macro_use] extern crate log;
-extern crate conhash;
+extern crate bufstream;
 extern crate byteorder;
-extern crate semver;
+extern crate conhash;
+#[macro_use]
+extern crate log;
 extern crate rand;
+extern crate semver;
 #[cfg(unix)]
 extern crate unix_socket;
-extern crate bufstream;
 
 pub use client::Client;
 

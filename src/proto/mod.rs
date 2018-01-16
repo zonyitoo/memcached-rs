@@ -9,11 +9,11 @@
 
 //! Memcached protocol
 
-use std::fmt::{Display, self};
 use std::collections::BTreeMap;
-use std::io;
-use std::error;
 use std::convert::From;
+use std::error;
+use std::fmt::{self, Display};
+use std::io;
 
 use semver::Version;
 
@@ -36,7 +36,7 @@ pub enum Error {
     IoError(io::Error),
     OtherError {
         desc: &'static str,
-        detail: Option<String>
+        detail: Option<String>,
     },
 }
 
@@ -45,12 +45,8 @@ pub type MemCachedResult<T> = Result<T, Error>;
 impl error::Error for Error {
     fn description(&self) -> &str {
         match self {
-            &Error::BinaryProtoError(ref err) => {
-                err.description()
-            },
-            &Error::IoError(ref err) => {
-                err.description()
-            },
+            &Error::BinaryProtoError(ref err) => err.description(),
+            &Error::IoError(ref err) => err.description(),
             &Error::OtherError { desc, .. } => desc,
         }
     }
@@ -62,10 +58,10 @@ impl Display for Error {
             &Error::BinaryProtoError(ref err) => err.fmt(f),
             &Error::IoError(ref err) => err.fmt(f),
             &Error::OtherError { desc, ref detail } => {
-                try!(write!(f, "{}", desc));
+                write!(f, "{}", desc)?;
                 match detail {
                     &Some(ref s) => write!(f, " ({})", s),
-                    &None => Ok(())
+                    &None => Ok(()),
                 }
             }
         }
@@ -90,11 +86,17 @@ impl From<byteorder::Error> for Error {
     }
 }
 
-pub trait Proto: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation {
+pub trait Proto
+    : Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation
+    {
     // fn clone(&self) -> Box<Proto + Send>;
 }
 
-impl<T> Proto for T where T: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation {}
+impl<T> Proto for T
+where
+    T: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation,
+{
+}
 
 pub trait Operation {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()>;
@@ -116,10 +118,22 @@ pub trait CasOperation {
     fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64>;
     fn get_cas(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32, u64)>;
     fn getk_cas(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, Vec<u8>, u32, u64)>;
-    fn increment_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
-        -> MemCachedResult<(u64, u64)>;
-    fn decrement_cas(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32, cas: u64)
-        -> MemCachedResult<(u64, u64)>;
+    fn increment_cas(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+        cas: u64,
+    ) -> MemCachedResult<(u64, u64)>;
+    fn decrement_cas(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+        cas: u64,
+    ) -> MemCachedResult<(u64, u64)>;
     fn append_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> MemCachedResult<u64>;
     fn prepend_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> MemCachedResult<u64>;
     fn touch_cas(&mut self, key: &[u8], expiration: u32, cas: u64) -> MemCachedResult<u64>;
