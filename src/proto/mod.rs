@@ -17,8 +17,6 @@ use std::io;
 
 use semver::Version;
 
-use byteorder;
-
 pub use self::binary::BinaryProto;
 
 mod binarydef;
@@ -77,12 +75,6 @@ impl From<io::Error> for Error {
 impl From<binary::Error> for Error {
     fn from(err: binary::Error) -> Error {
         Error::BinaryProtoError(err)
-    }
-}
-
-impl From<byteorder::Error> for Error {
-    fn from(err: byteorder::Error) -> Error {
-        Error::IoError(From::from(err))
     }
 }
 
