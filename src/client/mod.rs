@@ -40,6 +40,7 @@ impl Server {
                 proto::ProtoType::Binary => match (split.next(), split.next()) {
                     (Some("tcp"), Some(addr)) => {
                         let stream = TcpStream::connect(addr)?;
+                        stream.set_nodelay(true)?;
                         Box::new(proto::BinaryProto::new(BufStream::new(stream))) as Box<Proto + Send>
                     }
                     #[cfg(unix)]
