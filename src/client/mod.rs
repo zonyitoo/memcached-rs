@@ -10,12 +10,12 @@
 //! Memcached client
 
 use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
 use std::io;
 use std::net::TcpStream;
 use std::ops::Deref;
 use std::path::Path;
 use std::rc::Rc;
-use std::collections::{BTreeMap, HashMap};
 
 use conhash::{ConsistentHash, Node};
 
@@ -89,8 +89,8 @@ impl Deref for ServerRef {
 /// extern crate collect;
 ///
 /// use collect::BTreeMap;
-/// use memcached::client::{Client, AddrType};
-/// use memcached::proto::{Operation, MultiOperation, NoReplyOperation, CasOperation, ProtoType};
+/// use memcached::client::{AddrType, Client};
+/// use memcached::proto::{CasOperation, MultiOperation, NoReplyOperation, Operation, ProtoType};
 ///
 /// let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 ///
@@ -150,10 +150,7 @@ impl Operation for Client {
 
     fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server
-            .borrow_mut()
-            .proto
-            .replace(key, value, flags, expiration)
+        server.borrow_mut().proto.replace(key, value, flags, expiration)
     }
 
     fn get(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32)> {
@@ -168,18 +165,12 @@ impl Operation for Client {
 
     fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server
-            .borrow_mut()
-            .proto
-            .increment(key, amount, initial, expiration)
+        server.borrow_mut().proto.increment(key, amount, initial, expiration)
     }
 
     fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server
-            .borrow_mut()
-            .proto
-            .increment(key, amount, initial, expiration)
+        server.borrow_mut().proto.increment(key, amount, initial, expiration)
     }
 
     fn append(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
@@ -201,18 +192,12 @@ impl Operation for Client {
 impl NoReplyOperation for Client {
     fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server
-            .borrow_mut()
-            .proto
-            .set_noreply(key, value, flags, expiration)
+        server.borrow_mut().proto.set_noreply(key, value, flags, expiration)
     }
 
     fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server
-            .borrow_mut()
-            .proto
-            .add_noreply(key, value, flags, expiration)
+        server.borrow_mut().proto.add_noreply(key, value, flags, expiration)
     }
 
     fn delete_noreply(&mut self, key: &[u8]) -> MemCachedResult<()> {
@@ -222,10 +207,7 @@ impl NoReplyOperation for Client {
 
     fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server
-            .borrow_mut()
-            .proto
-            .replace_noreply(key, value, flags, expiration)
+        server.borrow_mut().proto.replace_noreply(key, value, flags, expiration)
     }
 
     fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()> {
@@ -258,18 +240,12 @@ impl NoReplyOperation for Client {
 impl CasOperation for Client {
     fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server
-            .borrow_mut()
-            .proto
-            .set_cas(key, value, flags, expiration, cas)
+        server.borrow_mut().proto.set_cas(key, value, flags, expiration, cas)
     }
 
     fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server
-            .borrow_mut()
-            .proto
-            .add_cas(key, value, flags, expiration)
+        server.borrow_mut().proto.add_cas(key, value, flags, expiration)
     }
 
     fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
@@ -347,7 +323,10 @@ impl MultiOperation for Client {
         let server = self.find_server_by_key(keys[0]);
         server.borrow_mut().proto.delete_multi(keys)
     }
-    fn increment_multi<'a>(&mut self, kv: HashMap<&'a [u8], (u64, u64, u32)>) -> MemCachedResult<HashMap<&'a [u8], u64>> {
+    fn increment_multi<'a>(
+        &mut self,
+        kv: HashMap<&'a [u8], (u64, u64, u32)>,
+    ) -> MemCachedResult<HashMap<&'a [u8], u64>> {
         assert_eq!(self.servers.len(), 1);
         let server = self.find_server_by_key(kv.keys().next().unwrap());
         server.borrow_mut().proto.increment_multi(kv)

@@ -1,16 +1,15 @@
 extern crate memcached;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate env_logger;
 
+use memcached::proto::{CasOperation, NoReplyOperation, Operation, ProtoType};
 use memcached::Client;
-use memcached::proto::{Operation, NoReplyOperation, CasOperation, ProtoType};
 
 fn main() {
     env_logger::init().unwrap();
 
-    let servers = [
-        ("unix:///tmp/memcached.sock", 10),
-    ];
+    let servers = [("unix:///tmp/memcached.sock", 10)];
     info!("Using servers: {:?} with Binary protocol", servers);
     let mut client = Client::connect(&servers, ProtoType::Binary).unwrap();
 

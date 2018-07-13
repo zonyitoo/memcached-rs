@@ -19,8 +19,8 @@ use semver::Version;
 
 pub use self::binary::BinaryProto;
 
-mod binarydef;
 pub mod binary;
+mod binarydef;
 
 /// Protocol type
 #[derive(Copy, Clone)]
@@ -32,10 +32,7 @@ pub enum ProtoType {
 pub enum Error {
     BinaryProtoError(binary::Error),
     IoError(io::Error),
-    OtherError {
-        desc: &'static str,
-        detail: Option<String>,
-    },
+    OtherError { desc: &'static str, detail: Option<String> },
 }
 
 pub type MemCachedResult<T> = Result<T, Error>;
@@ -78,17 +75,11 @@ impl From<binary::Error> for Error {
     }
 }
 
-pub trait Proto
-    : Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation
-    {
+pub trait Proto: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation {
     // fn clone(&self) -> Box<Proto + Send>;
 }
 
-impl<T> Proto for T
-where
-    T: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation,
-{
-}
+impl<T> Proto for T where T: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation {}
 
 pub trait Operation {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()>;
@@ -142,7 +133,10 @@ pub trait ServerOperation {
 pub trait MultiOperation {
     fn set_multi(&mut self, kv: BTreeMap<&[u8], (&[u8], u32, u32)>) -> MemCachedResult<()>;
     fn delete_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<()>;
-    fn increment_multi<'a>(&mut self, kv: HashMap<&'a [u8], (u64, u64, u32)>) -> MemCachedResult<HashMap<&'a [u8], u64>>;
+    fn increment_multi<'a>(
+        &mut self,
+        kv: HashMap<&'a [u8], (u64, u64, u32)>,
+    ) -> MemCachedResult<HashMap<&'a [u8], u64>>;
     fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>>;
 }
 

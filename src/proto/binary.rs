@@ -17,9 +17,9 @@ use std::string::String;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
+use proto::binarydef::{Command, DataType, RequestHeader, RequestPacket, RequestPacketRef, ResponsePacket};
 use proto::{self, AuthResponse, MemCachedResult};
 use proto::{AuthOperation, CasOperation, MultiOperation, NoReplyOperation, Operation, ServerOperation};
-use proto::binarydef::{Command, DataType, RequestHeader, RequestPacket, RequestPacketRef, ResponsePacket};
 
 use semver::Version;
 
@@ -124,16 +124,8 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Set,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &extra,
-            value,
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Set, DataType::RawBytes, 0, opaque, 0, key, &extra, value);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -171,16 +163,8 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Add,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &extra,
-            value,
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Add, DataType::RawBytes, 0, opaque, 0, key, &extra, value);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -208,16 +192,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header = RequestHeader::from_payload(
-            Command::Delete,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &[],
-            &[],
-        );
+        let req_header = RequestHeader::from_payload(Command::Delete, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -255,16 +230,8 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Replace,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &extra,
-            value,
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Replace, DataType::RawBytes, 0, opaque, 0, key, &extra, value);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -292,16 +259,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header = RequestHeader::from_payload(
-            Command::Get,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &[],
-            &[],
-        );
+        let req_header = RequestHeader::from_payload(Command::Get, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -334,16 +292,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header = RequestHeader::from_payload(
-            Command::GetKey,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &[],
-            &[],
-        );
+        let req_header = RequestHeader::from_payload(Command::GetKey, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -387,16 +336,8 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Increment,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &extra,
-            &[],
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, 0, key, &extra, &[]);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -438,16 +379,8 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Decrement,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &extra,
-            &[],
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Decrement, DataType::RawBytes, 0, opaque, 0, key, &extra, &[]);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -479,16 +412,8 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             str::from_utf8(key).unwrap_or("<not-utf8-key>"),
             value
         );
-        let req_header = RequestHeader::from_payload(
-            Command::Append,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &[],
-            value,
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Append, DataType::RawBytes, 0, opaque, 0, key, &[], value);
         let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -517,16 +442,8 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             str::from_utf8(key).unwrap_or("<not-utf8-key>"),
             value
         );
-        let req_header = RequestHeader::from_payload(
-            Command::Prepend,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &[],
-            value,
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Prepend, DataType::RawBytes, 0, opaque, 0, key, &[], value);
         let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -561,16 +478,8 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Touch,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &extra,
-            &[],
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Touch, DataType::RawBytes, 0, opaque, 0, key, &extra, &[]);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -596,16 +505,7 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
     fn quit(&mut self) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!("Quit");
-        let req_header = RequestHeader::from_payload(
-            Command::Quit,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            &[],
-            &[],
-            &[],
-        );
+        let req_header = RequestHeader::from_payload(Command::Quit, DataType::RawBytes, 0, opaque, 0, &[], &[], &[]);
         let req_packet = RequestPacketRef::new(&req_header, &[], &[], &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -635,16 +535,8 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Flush,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            &[],
-            &extra,
-            &[],
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Flush, DataType::RawBytes, 0, opaque, 0, &[], &extra, &[]);
         let req_packet = RequestPacketRef::new(&req_header, &extra, &[], &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -793,16 +685,8 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
                 extra_buf.write_u32::<BigEndian>(expiration)?;
             }
 
-            let req_header = RequestHeader::from_payload(
-                Command::SetQuietly,
-                DataType::RawBytes,
-                0,
-                0,
-                0,
-                key,
-                &extra,
-                value,
-            );
+            let req_header =
+                RequestHeader::from_payload(Command::SetQuietly, DataType::RawBytes, 0, 0, 0, key, &extra, value);
             let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
             req_packet.write_to(&mut self.stream)?;
@@ -825,16 +709,8 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
 
     fn delete_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<()> {
         for key in keys.iter() {
-            let req_header = RequestHeader::from_payload(
-                Command::DeleteQuietly,
-                DataType::RawBytes,
-                0,
-                0,
-                0,
-                *key,
-                &[],
-                &[],
-            );
+            let req_header =
+                RequestHeader::from_payload(Command::DeleteQuietly, DataType::RawBytes, 0, 0, 0, *key, &[], &[]);
             let req_packet = RequestPacketRef::new(&req_header, &[], *key, &[]);
 
             req_packet.write_to(&mut self.stream)?;
@@ -855,39 +731,41 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
         }
     }
 
-    fn increment_multi<'a>(&mut self, kv: HashMap<&'a [u8], (u64, u64, u32)>) -> MemCachedResult<HashMap<&'a [u8], u64>> {
-        let opaques: MemCachedResult<HashMap<_, _>> = kv.into_iter().map(|(key, (amount, initial, expiration))| {
-            let opaque = random::<u32>();
-            let mut extra = [0u8; 20];
-            {
-                let mut extra_buf = Cursor::new(&mut extra[..]);
-                try!(extra_buf.write_u64::<BigEndian>(amount));
-                try!(extra_buf.write_u64::<BigEndian>(initial));
-                try!(extra_buf.write_u32::<BigEndian>(expiration));
-            }
+    fn increment_multi<'a>(
+        &mut self,
+        kv: HashMap<&'a [u8], (u64, u64, u32)>,
+    ) -> MemCachedResult<HashMap<&'a [u8], u64>> {
+        let opaques: MemCachedResult<HashMap<_, _>> = kv
+            .into_iter()
+            .map(|(key, (amount, initial, expiration))| {
+                let opaque = random::<u32>();
+                let mut extra = [0u8; 20];
+                {
+                    let mut extra_buf = Cursor::new(&mut extra[..]);
+                    extra_buf.write_u64::<BigEndian>(amount)?;
+                    extra_buf.write_u64::<BigEndian>(initial)?;
+                    extra_buf.write_u32::<BigEndian>(expiration)?;
+                }
 
-            let req_header = RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, 0,
-                                                         key, &extra, &[]);
-            let req_packet = RequestPacketRef::new(
-                                    &req_header,
-                                    &extra,
-                                    key,
-                                    &[]);
+                let req_header =
+                    RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, 0, key, &extra, &[]);
+                let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
-            try!(req_packet.write_to(&mut self.stream));
-            Ok((opaque, key))
-        }).collect();
+                req_packet.write_to(&mut self.stream)?;
+                Ok((opaque, key))
+            })
+            .collect();
 
-        let opaques = try!(opaques);
+        let opaques = opaques?;
 
-        try!(self.send_noop());
-        try!(self.stream.flush());
+        self.send_noop()?;
+        self.stream.flush()?;
 
         let mut results = HashMap::with_capacity(opaques.len());
         loop {
-            let resp = try!(ResponsePacket::read_from(&mut self.stream));
+            let resp = ResponsePacket::read_from(&mut self.stream)?;
             match resp.header.status {
-                Status::NoError => {},
+                Status::NoError => {}
                 _ => return Err(From::from(Error::from_status(resp.header.status, None))),
             }
 
@@ -898,7 +776,7 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
             match opaques.get(&resp.header.opaque) {
                 Some(&key) => {
                     let mut bufr = BufReader::new(&resp.value[..]);
-                    let val = try!(bufr.read_u64::<BigEndian>());
+                    let val = bufr.read_u64::<BigEndian>()?;
                     results.insert(key, val);
                 }
                 None => {}
@@ -908,16 +786,8 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
 
     fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>> {
         for key in keys.iter() {
-            let req_header = RequestHeader::from_payload(
-                Command::GetKeyQuietly,
-                DataType::RawBytes,
-                0,
-                0,
-                0,
-                *key,
-                &[],
-                &[],
-            );
+            let req_header =
+                RequestHeader::from_payload(Command::GetKeyQuietly, DataType::RawBytes, 0, 0, 0, *key, &[], &[]);
             let req_packet = RequestPacketRef::new(&req_header, &[], *key, &[]);
 
             req_packet.write_to(&mut self.stream)?;
@@ -1022,16 +892,8 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header = RequestHeader::from_payload(
-            Command::DeleteQuietly,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &[],
-            &[],
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::DeleteQuietly, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1219,16 +1081,8 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Set,
-            DataType::RawBytes,
-            0,
-            opaque,
-            cas,
-            key,
-            &extra,
-            value,
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Set, DataType::RawBytes, 0, opaque, cas, key, &extra, value);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1266,16 +1120,8 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Add,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &extra,
-            value,
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Add, DataType::RawBytes, 0, opaque, 0, key, &extra, value);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1314,16 +1160,8 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Replace,
-            DataType::RawBytes,
-            0,
-            opaque,
-            cas,
-            key,
-            &extra,
-            value,
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Replace, DataType::RawBytes, 0, opaque, cas, key, &extra, value);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1351,16 +1189,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header = RequestHeader::from_payload(
-            Command::Get,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &[],
-            &[],
-        );
+        let req_header = RequestHeader::from_payload(Command::Get, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1393,16 +1222,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header = RequestHeader::from_payload(
-            Command::GetKey,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            key,
-            &[],
-            &[],
-        );
+        let req_header = RequestHeader::from_payload(Command::GetKey, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1454,16 +1274,8 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Increment,
-            DataType::RawBytes,
-            0,
-            opaque,
-            cas,
-            key,
-            &extra,
-            &[],
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, cas, key, &extra, &[]);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1513,16 +1325,8 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Decrement,
-            DataType::RawBytes,
-            0,
-            opaque,
-            cas,
-            key,
-            &extra,
-            &[],
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Decrement, DataType::RawBytes, 0, opaque, cas, key, &extra, &[]);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1555,16 +1359,8 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             value,
             cas
         );
-        let req_header = RequestHeader::from_payload(
-            Command::Append,
-            DataType::RawBytes,
-            0,
-            opaque,
-            cas,
-            key,
-            &[],
-            value,
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Append, DataType::RawBytes, 0, opaque, cas, key, &[], value);
         let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1594,16 +1390,8 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             value,
             cas
         );
-        let req_header = RequestHeader::from_payload(
-            Command::Prepend,
-            DataType::RawBytes,
-            0,
-            opaque,
-            cas,
-            key,
-            &[],
-            value,
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Prepend, DataType::RawBytes, 0, opaque, cas, key, &[], value);
         let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1639,16 +1427,8 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header = RequestHeader::from_payload(
-            Command::Touch,
-            DataType::RawBytes,
-            0,
-            opaque,
-            cas,
-            key,
-            &extra,
-            &[],
-        );
+        let req_header =
+            RequestHeader::from_payload(Command::Touch, DataType::RawBytes, 0, opaque, cas, key, &extra, &[]);
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1674,16 +1454,7 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
     fn list_mechanisms(&mut self) -> MemCachedResult<Vec<String>> {
         let opaque = random::<u32>();
         debug!("List mechanisms");
-        let req_header = RequestHeader::new(
-            Command::SaslListMechanisms,
-            DataType::RawBytes,
-            0,
-            opaque,
-            0,
-            0,
-            0,
-            0,
-        );
+        let req_header = RequestHeader::new(Command::SaslListMechanisms, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
         let req_packet = RequestPacketRef::new(&req_header, &[], &[], &[]);
         req_packet.write_to(&mut self.stream)?;
         self.stream.flush()?;

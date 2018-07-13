@@ -25,5 +25,5 @@ extern crate unix_socket;
 
 pub use client::Client;
 
-pub mod proto;
 pub mod client;
+pub mod proto;

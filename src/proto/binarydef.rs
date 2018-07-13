@@ -547,16 +547,7 @@ impl ResponseHeader {
         let extra_len = extra.len() as u8;
         let body_len = (key.len() + extra.len() + value.len()) as u32;
 
-        ResponseHeader::new(
-            cmd,
-            dtype,
-            status,
-            opaque,
-            cas,
-            key_len,
-            extra_len,
-            body_len,
-        )
+        ResponseHeader::new(cmd, dtype, status, opaque, cas, key_len, extra_len, body_len)
     }
 
     #[inline]
@@ -624,16 +615,7 @@ impl RequestPacket {
         value: Vec<u8>,
     ) -> RequestPacket {
         RequestPacket {
-            header: RequestHeader::from_payload(
-                cmd,
-                dtype,
-                vbid,
-                opaque,
-                cas,
-                &key[..],
-                &extra[..],
-                &value[..],
-            ),
+            header: RequestHeader::from_payload(cmd, dtype, vbid, opaque, cas, &key[..], &extra[..], &value[..]),
             extra: extra,
             key: key,
             value: value,
@@ -685,12 +667,7 @@ impl RequestPacket {
     }
 
     pub fn as_ref<'a>(&'a self) -> RequestPacketRef<'a> {
-        RequestPacketRef::new(
-            &self.header,
-            &self.extra[..],
-            &self.key[..],
-            &self.value[..],
-        )
+        RequestPacketRef::new(&self.header, &self.extra[..], &self.key[..], &self.value[..])
     }
 }
 
@@ -743,16 +720,7 @@ impl ResponsePacket {
         value: Vec<u8>,
     ) -> ResponsePacket {
         ResponsePacket {
-            header: ResponseHeader::from_payload(
-                cmd,
-                dtype,
-                status,
-                opaque,
-                cas,
-                &key[..],
-                &extra[..],
-                &value[..],
-            ),
+            header: ResponseHeader::from_payload(cmd, dtype, status, opaque, cas, &key[..], &extra[..], &value[..]),
             extra: extra,
             key: key,
             value: value,

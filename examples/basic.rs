@@ -1,18 +1,17 @@
 extern crate memcached;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate env_logger;
 
 use std::thread;
 
+use memcached::proto::{CasOperation, NoReplyOperation, Operation, ProtoType};
 use memcached::Client;
-use memcached::proto::{Operation, NoReplyOperation, CasOperation, ProtoType};
 
 fn main() {
     env_logger::init().unwrap();
 
-    let servers = [
-        ("tcp://127.0.0.1:11211", 1),
-    ];
+    let servers = [("tcp://127.0.0.1:11211", 1)];
     info!("Using servers: {:?} with Binary protocol", servers);
     let mut client = Client::connect(&servers, ProtoType::Binary).unwrap();
 
@@ -28,7 +27,7 @@ fn main() {
 
     let mut handlers = Vec::new();
     for _ in 0..4 {
-        let handler = thread::spawn(move|| {
+        let handler = thread::spawn(move || {
             let mut client = Client::connect(&servers, ProtoType::Binary).unwrap();
             let (_, _, mut cas) = client.get_cas(b"key:dontreply").unwrap();
             for _ in 0..100 {
