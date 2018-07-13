@@ -7,7 +7,7 @@ use memcached::proto::{CasOperation, NoReplyOperation, Operation, ProtoType};
 use memcached::Client;
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::init();
 
     let servers = [("unix:///tmp/memcached.sock", 10)];
     info!("Using servers: {:?} with Binary protocol", servers);
