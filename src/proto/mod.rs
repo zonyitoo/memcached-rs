@@ -9,7 +9,7 @@
 
 //! Memcached protocol
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::From;
 use std::error;
 use std::fmt::{self, Display};
@@ -142,7 +142,8 @@ pub trait ServerOperation {
 pub trait MultiOperation {
     fn set_multi(&mut self, kv: BTreeMap<&[u8], (&[u8], u32, u32)>) -> MemCachedResult<()>;
     fn delete_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<()>;
-    fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<BTreeMap<Vec<u8>, (Vec<u8>, u32)>>;
+    fn increment_multi<'a>(&mut self, kv: HashMap<&'a [u8], (u64, u64, u32)>) -> MemCachedResult<HashMap<&'a [u8], u64>>;
+    fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>>;
 }
 
 pub trait NoReplyOperation {

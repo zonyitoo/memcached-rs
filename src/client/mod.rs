@@ -15,6 +15,7 @@ use std::net::TcpStream;
 use std::ops::Deref;
 use std::path::Path;
 use std::rc::Rc;
+use std::collections::{BTreeMap, HashMap};
 
 use conhash::{ConsistentHash, Node};
 
@@ -24,7 +25,7 @@ use bufstream::BufStream;
 use unix_socket::UnixStream;
 
 use proto::{self, MemCachedResult};
-use proto::{CasOperation, NoReplyOperation, Operation, Proto};
+use proto::{CasOperation, MultiOperation, NoReplyOperation, Operation, Proto};
 
 struct Server {
     pub proto: Box<Proto + Send>,
@@ -332,6 +333,29 @@ impl CasOperation for Client {
     fn touch_cas(&mut self, key: &[u8], expiration: u32, cas: u64) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
         server.borrow_mut().proto.touch_cas(key, expiration, cas)
+    }
+}
+
+impl MultiOperation for Client {
+    fn set_multi(&mut self, kv: BTreeMap<&[u8], (&[u8], u32, u32)>) -> MemCachedResult<()> {
+        assert_eq!(self.servers.len(), 1);
+        let server = self.find_server_by_key(kv.keys().next().unwrap());
+        server.borrow_mut().proto.set_multi(kv)
+    }
+    fn delete_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<()> {
+        assert_eq!(self.servers.len(), 1);
+        let server = self.find_server_by_key(keys[0]);
+        server.borrow_mut().proto.delete_multi(keys)
+    }
+    fn increment_multi<'a>(&mut self, kv: HashMap<&'a [u8], (u64, u64, u32)>) -> MemCachedResult<HashMap<&'a [u8], u64>> {
+        assert_eq!(self.servers.len(), 1);
+        let server = self.find_server_by_key(kv.keys().next().unwrap());
+        server.borrow_mut().proto.increment_multi(kv)
+    }
+    fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>> {
+        assert_eq!(self.servers.len(), 1);
+        let server = self.find_server_by_key(keys[0]);
+        server.borrow_mut().proto.get_multi(keys)
     }
 }
 
