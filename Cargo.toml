@@ -1,6 +1,6 @@
 [package]
 name = "memcached-rs"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Y. T. CHUNG <zonyitoo@gmail.com>"]
 description = "A MemCached Library in Rust"
 repository = "https://github.com/zonyitoo/memcached-rs"
@@ -16,7 +16,7 @@ nightly = []
 [dependencies]
 byteorder = "1.2"
 semver = "0.9"
-rand = "0.4"
+rand = "0.5"
 conhash = "0.4"
 log = "0.4"
 bufstream = "0.1"
@@ -25,4 +25,4 @@ bufstream = "0.1"
 unix_socket = "0.5"
 
 [dev-dependencies]
-env_logger = "0.4"
+env_logger = "0.5"
