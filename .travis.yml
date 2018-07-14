@@ -5,5 +5,6 @@ services:
     - memcached
 
 script:
-    - cargo build -v --features nightly
-    - cargo test -v --features nightly
+    - cargo check --features nightly --all --all-targets
+    - cargo build --features nightly
+    - cargo test --features nightly --no-fail-fast
