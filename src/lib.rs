@@ -23,7 +23,7 @@ extern crate semver;
 #[cfg(unix)]
 extern crate unix_socket;
 
-pub use client::Client;
+pub use client::{Client, Sasl};
 
 pub mod client;
 pub mod proto;

@@ -18,7 +18,7 @@ fn main() {
     let servers = [
         ("tcp://127.0.0.1:11211", 1),
     ];
-    let mut client = Client::connect(&servers, ProtoType::Binary).unwrap();
+    let mut client = Client::connect(&servers, ProtoType::Binary, None).unwrap();
 
     client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
     let (value, flags) = client.get(b"Foo").unwrap();
@@ -33,6 +33,28 @@ fn main() {
 ```
 
 Run `cargo doc --open` for more details.
+
+### SASL authentication
+
+TCP connections support `PLAIN` SASL authentication:
+
+```rust
+extern crate memcached;
+
+use memcached::proto::{Operation, ProtoType};
+use memcached::{Client, Sasl};
+
+fn main() {
+    let servers = [("tcp://my-sasl-memcached-server.com:11211", 1)];
+    let sasl = Sasl {username: "my-username", password: "my-password"};
+    let mut client = Client::connect(&servers, ProtoType::Binary, Some(sasl)).unwrap();
+
+    client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
+    let (value, flags) = client.get(b"Foo").unwrap();
+    assert_eq!(&value[..], b"Bar");
+    assert_eq!(flags, 0xdeadbeef);
+}
+```
 
 ## TODO
 
