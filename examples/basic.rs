@@ -13,7 +13,7 @@ fn main() {
 
     let servers = [("tcp://127.0.0.1:11211", 1)];
     info!("Using servers: {:?} with Binary protocol", servers);
-    let mut client = Client::connect(&servers, ProtoType::Binary, None).unwrap();
+    let mut client = Client::connect(&servers, ProtoType::Binary).unwrap();
 
     client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
     let (value, flags) = client.get(b"Foo").unwrap();
@@ -28,7 +28,7 @@ fn main() {
     let mut handlers = Vec::new();
     for _ in 0..4 {
         let handler = thread::spawn(move || {
-            let mut client = Client::connect(&servers, ProtoType::Binary, None).unwrap();
+            let mut client = Client::connect(&servers, ProtoType::Binary).unwrap();
             let (_, _, mut cas) = client.get_cas(b"key:dontreply").unwrap();
             for _ in 0..100 {
                 debug!("Setting in {:?}", thread::current());

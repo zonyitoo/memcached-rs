@@ -27,9 +27,9 @@ use unix_socket::UnixStream;
 use proto::{self, MemCachedResult, AuthResponse};
 use proto::{CasOperation, MultiOperation, NoReplyOperation, Operation, Proto};
 
-pub struct Sasl<'a> {
-    pub username: &'a str,
-    pub password: &'a str
+struct Sasl<'a> {
+    username: &'a str,
+    password: &'a str
 }
 
 struct Server {
@@ -107,7 +107,7 @@ impl Deref for ServerRef {
 /// use memcached::client::{Client};
 /// use memcached::proto::{CasOperation, MultiOperation, NoReplyOperation, Operation, ProtoType};
 ///
-/// let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary, None).unwrap();
+/// let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 ///
 /// client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
 /// let (value, flags) = client.get(b"Foo").unwrap();
@@ -130,7 +130,21 @@ impl Client {
     /// as a array of tuples in this form
     ///
     /// `(address, weight)`.
-    pub fn connect(svrs: &[(&str, usize)], p: proto::ProtoType, sasl: Option<Sasl>) -> io::Result<Client> {
+    pub fn connect(svrs: &[(&str, usize)], p: proto::ProtoType) -> io::Result<Client> {
+        Client::conn(svrs, p, None)
+    }
+
+    /// Connect to Memcached servers that require SASL authentication
+    ///
+    /// This function accept multiple servers, servers information should be represented
+    /// as a array of tuples in this form
+    ///
+    /// `(address, weight)`.
+    pub fn connect_sasl(svrs: &[(&str, usize)], p: proto::ProtoType, username: &str, password: &str) -> io::Result<Client> {
+        Client::conn(svrs, p, Some(Sasl{username: username, password: password}))
+    }
+
+    fn conn(svrs: &[(&str, usize)], p: proto::ProtoType, sasl: Option<Sasl>) -> io::Result<Client> {
         assert!(!svrs.is_empty(), "Server list should not be empty");
 
         let mut servers = ConsistentHash::new();
@@ -369,7 +383,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(64);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary, None).unwrap();
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, &val[..], 0, 2));
     }
@@ -379,7 +393,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(64);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary, None).unwrap();
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
@@ -389,7 +403,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(512);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary, None).unwrap();
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, &val[..], 0, 2));
     }
@@ -399,7 +413,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(512);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary, None).unwrap();
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
@@ -409,7 +423,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(1024);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary, None).unwrap();
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, &val[..], 0, 2));
     }
@@ -419,7 +433,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(1024);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary, None).unwrap();
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
@@ -429,7 +443,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(4096);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary, None).unwrap();
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, &val[..], 0, 2));
     }
@@ -439,7 +453,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(4096);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary, None).unwrap();
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
@@ -449,7 +463,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(16384);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary, None).unwrap();
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, &val[..], 0, 2));
     }
@@ -459,7 +473,7 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(16384);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary, None).unwrap();
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }

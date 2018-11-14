@@ -11,7 +11,7 @@ fn main() {
 
     let servers = [("unix:///tmp/memcached.sock", 10)];
     info!("Using servers: {:?} with Binary protocol", servers);
-    let mut client = Client::connect(&servers, ProtoType::Binary, None).unwrap();
+    let mut client = Client::connect(&servers, ProtoType::Binary).unwrap();
 
     client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
     let (value, flags) = client.get(b"Foo").unwrap();
