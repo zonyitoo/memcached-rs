@@ -86,10 +86,7 @@ impl Deref for ServerRef {
 /// Memcached client
 ///
 /// ```ignore
-/// extern crate collect;
-///
-/// use collect::BTreeMap;
-/// use memcached::client::{AddrType, Client};
+/// use memcached::client::{Client};
 /// use memcached::proto::{CasOperation, MultiOperation, NoReplyOperation, Operation, ProtoType};
 ///
 /// let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
