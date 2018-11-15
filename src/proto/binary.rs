@@ -1752,13 +1752,6 @@ mod test {
             Some(&(b"last!".to_vec(), 0xdeadbeef))
         );
 
-        assert_eq!(get_resp_map.get(&b"test:multi_hello1".to_vec()), None);
-        assert_eq!(get_resp_map.get(&b"test:multi_hello2".to_vec()), None);
-        assert_eq!(
-            get_resp_map.get(&b"test:multi_lastone".to_vec()),
-            Some(&(b"last!".to_vec(), 0xdeadbeef))
-        );
-
         let mut data = HashMap::new();
         data.insert(&b"test:multi_num1"[..], (10, 50, 120));
         data.insert(&b"test:multi_num2"[..], (20, 50, 120));
