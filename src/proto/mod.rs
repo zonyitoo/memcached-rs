@@ -75,11 +75,11 @@ impl From<binary::Error> for Error {
     }
 }
 
-pub trait Proto: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation {
+pub trait Proto: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation + AuthOperation {
     // fn clone(&self) -> Box<Proto + Send>;
 }
 
-impl<T> Proto for T where T: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation {}
+impl<T> Proto for T where T: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation + AuthOperation {}
 
 pub trait Operation {
     fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()>;
