@@ -38,11 +38,10 @@ struct Server {
 }
 
 impl Server {
-    fn connect(addr: &str, protocol: proto::ProtoType, o_sasl: &Option<Sasl>) -> io::Result<Server> {
-        let mut split = addr.split("://");
-
-        Ok(Server {
-            proto: match protocol {
+    fn connect(addr: String, protocol: proto::ProtoType, o_sasl: &Option<Sasl>) -> io::Result<Server> {
+        let proto = {
+            let mut split = addr.split("://");
+            match protocol {
                 proto::ProtoType::Binary => match (split.next(), split.next()) {
                     (Some("tcp"), Some(addr)) => {
                         let stream = TcpStream::connect(addr)?;
@@ -72,8 +71,11 @@ impl Server {
                     }
                     _ => panic!("Malformed address"),
                 },
-            },
-            addr: addr.to_owned(),
+            }
+        };
+        Ok(Server {
+            proto: proto,
+            addr: addr,
         })
     }
 }
@@ -130,7 +132,7 @@ impl Client {
     /// as a array of tuples in this form
     ///
     /// `(address, weight)`.
-    pub fn connect(svrs: &[(&str, usize)], p: proto::ProtoType) -> io::Result<Client> {
+    pub fn connect<S: ToString>(svrs: &[(S, usize)], p: proto::ProtoType) -> io::Result<Client> {
         Client::conn(svrs, p, None)
     }
 
@@ -140,17 +142,17 @@ impl Client {
     /// as a array of tuples in this form
     ///
     /// `(address, weight)`.
-    pub fn connect_sasl(svrs: &[(&str, usize)], p: proto::ProtoType, username: &str, password: &str) -> io::Result<Client> {
+    pub fn connect_sasl<S: ToString>(svrs: &[(S, usize)], p: proto::ProtoType, username: &str, password: &str) -> io::Result<Client> {
         Client::conn(svrs, p, Some(Sasl{username: username, password: password}))
     }
 
-    fn conn(svrs: &[(&str, usize)], p: proto::ProtoType, sasl: Option<Sasl>) -> io::Result<Client> {
+    fn conn<S: ToString>(svrs: &[(S, usize)], p: proto::ProtoType, sasl: Option<Sasl>) -> io::Result<Client> {
         assert!(!svrs.is_empty(), "Server list should not be empty");
 
         let mut servers = ConsistentHash::new();
-        for &(addr, weight) in svrs.iter() {
-            let svr = Server::connect(addr, p, &sasl)?;
-            servers.add(&ServerRef(Rc::new(RefCell::new(svr))), weight);
+        for (addr, weight) in svrs.iter() {
+            let svr = Server::connect(addr.to_string(), p, &sasl)?;
+            servers.add(&ServerRef(Rc::new(RefCell::new(svr))), *weight);
         }
 
         Ok(Client { servers: servers })
