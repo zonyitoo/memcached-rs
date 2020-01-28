@@ -16,10 +16,15 @@ use std::str;
 use std::string::String;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use log::debug;
 
-use proto::binarydef::{Command, DataType, RequestHeader, RequestPacket, RequestPacketRef, ResponsePacket};
-use proto::{self, AuthResponse, MemCachedResult};
-use proto::{AuthOperation, CasOperation, MultiOperation, NoReplyOperation, Operation, ServerOperation};
+use crate::proto::binarydef::{
+    Command, DataType, RequestHeader, RequestPacket, RequestPacketRef, ResponsePacket,
+};
+use crate::proto::{self, AuthResponse, MemCachedResult};
+use crate::proto::{
+    AuthOperation, CasOperation, MultiOperation, NoReplyOperation, Operation, ServerOperation,
+};
 
 use semver::Version;
 
@@ -37,9 +42,9 @@ pub struct Error {
 impl Error {
     fn from_status(status: Status, detail: Option<String>) -> Error {
         Error {
-            status: status,
+            status,
             desc: status.desc(),
-            detail: detail,
+            detail,
         }
     }
 
@@ -64,11 +69,7 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
-    fn description(&self) -> &str {
-        self.desc
-    }
-}
+impl error::Error for Error {}
 
 pub struct BinaryProto<T: BufRead + Write + Send> {
     stream: T,
@@ -82,7 +83,7 @@ pub struct BinaryProto<T: BufRead + Write + Send> {
 
 impl<T: BufRead + Write + Send> BinaryProto<T> {
     pub fn new(stream: T) -> BinaryProto<T> {
-        BinaryProto { stream: stream }
+        BinaryProto { stream }
     }
 
     fn send_noop(&mut self) -> MemCachedResult<u32> {
@@ -107,7 +108,13 @@ impl<T: BufRead + Write + Send> BinaryProto<T> {
 }
 
 impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
-    fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn set(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!(
             "Set key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
@@ -124,8 +131,16 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Set, DataType::RawBytes, 0, opaque, 0, key, &extra, value);
+        let req_header = RequestHeader::from_payload(
+            Command::Set,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            value,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -146,7 +161,13 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
         }
     }
 
-    fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn add(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!(
             "Add key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
@@ -163,8 +184,16 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Add, DataType::RawBytes, 0, opaque, 0, key, &extra, value);
+        let req_header = RequestHeader::from_payload(
+            Command::Add,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            value,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -192,7 +221,16 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header = RequestHeader::from_payload(Command::Delete, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Delete,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -213,7 +251,13 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
         }
     }
 
-    fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn replace(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!(
             "Replace key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
@@ -230,8 +274,16 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Replace, DataType::RawBytes, 0, opaque, 0, key, &extra, value);
+        let req_header = RequestHeader::from_payload(
+            Command::Replace,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            value,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -259,7 +311,16 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header = RequestHeader::from_payload(Command::Get, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Get,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -292,7 +353,16 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header = RequestHeader::from_payload(Command::GetKey, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::GetKey,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -318,7 +388,13 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
         }
     }
 
-    fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
+    fn increment(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+    ) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
         debug!(
             "Increment key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
@@ -336,8 +412,16 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, 0, key, &extra, &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Increment,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -361,7 +445,13 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
         }
     }
 
-    fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
+    fn decrement(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+    ) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
         debug!(
             "Decrement key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
@@ -379,8 +469,16 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Decrement, DataType::RawBytes, 0, opaque, 0, key, &extra, &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Decrement,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -412,8 +510,16 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             str::from_utf8(key).unwrap_or("<not-utf8-key>"),
             value
         );
-        let req_header =
-            RequestHeader::from_payload(Command::Append, DataType::RawBytes, 0, opaque, 0, key, &[], value);
+        let req_header = RequestHeader::from_payload(
+            Command::Append,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            value,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -442,8 +548,16 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             str::from_utf8(key).unwrap_or("<not-utf8-key>"),
             value
         );
-        let req_header =
-            RequestHeader::from_payload(Command::Prepend, DataType::RawBytes, 0, opaque, 0, key, &[], value);
+        let req_header = RequestHeader::from_payload(
+            Command::Prepend,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            value,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -478,8 +592,16 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Touch, DataType::RawBytes, 0, opaque, 0, key, &extra, &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Touch,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -505,7 +627,16 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
     fn quit(&mut self) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!("Quit");
-        let req_header = RequestHeader::from_payload(Command::Quit, DataType::RawBytes, 0, opaque, 0, &[], &[], &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Quit,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            &[],
+            &[],
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], &[], &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -535,8 +666,16 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Flush, DataType::RawBytes, 0, opaque, 0, &[], &extra, &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Flush,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            &[],
+            &extra,
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, &[], &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -578,7 +717,8 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
     fn version(&mut self) -> MemCachedResult<Version> {
         let opaque = random::<u32>();
         debug!("Version");
-        let req_header = RequestHeader::new(Command::Version, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
+        let req_header =
+            RequestHeader::new(Command::Version, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
         let req_packet = RequestPacketRef::new(&req_header, &[], &[], &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -623,7 +763,8 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
     fn stat(&mut self) -> MemCachedResult<BTreeMap<String, String>> {
         let opaque = random::<u32>();
         debug!("Stat");
-        let req_header = RequestHeader::new(Command::Stat, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
+        let req_header =
+            RequestHeader::new(Command::Stat, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
         let req_packet = RequestPacketRef::new(&req_header, &[], &[], &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -644,7 +785,7 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
                 _ => return Err(From::from(Error::from_status(resp.header.status, None))),
             }
 
-            if resp.key.len() == 0 && resp.value.len() == 0 {
+            if resp.key.is_empty() && resp.value.is_empty() {
                 break;
             }
 
@@ -685,8 +826,16 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
                 extra_buf.write_u32::<BigEndian>(expiration)?;
             }
 
-            let req_header =
-                RequestHeader::from_payload(Command::SetQuietly, DataType::RawBytes, 0, 0, 0, key, &extra, value);
+            let req_header = RequestHeader::from_payload(
+                Command::SetQuietly,
+                DataType::RawBytes,
+                0,
+                0,
+                0,
+                key,
+                &extra,
+                value,
+            );
             let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
             req_packet.write_to(&mut self.stream)?;
@@ -709,8 +858,16 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
 
     fn delete_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<()> {
         for key in keys.iter() {
-            let req_header =
-                RequestHeader::from_payload(Command::DeleteQuietly, DataType::RawBytes, 0, 0, 0, *key, &[], &[]);
+            let req_header = RequestHeader::from_payload(
+                Command::DeleteQuietly,
+                DataType::RawBytes,
+                0,
+                0,
+                0,
+                *key,
+                &[],
+                &[],
+            );
             let req_packet = RequestPacketRef::new(&req_header, &[], *key, &[]);
 
             req_packet.write_to(&mut self.stream)?;
@@ -747,8 +904,16 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
                     extra_buf.write_u32::<BigEndian>(expiration)?;
                 }
 
-                let req_header =
-                    RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, 0, key, &extra, &[]);
+                let req_header = RequestHeader::from_payload(
+                    Command::Increment,
+                    DataType::RawBytes,
+                    0,
+                    opaque,
+                    0,
+                    key,
+                    &extra,
+                    &[],
+                );
                 let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
                 req_packet.write_to(&mut self.stream)?;
@@ -773,21 +938,26 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
                 return Ok(results);
             }
 
-            match opaques.get(&resp.header.opaque) {
-                Some(&key) => {
-                    let mut bufr = BufReader::new(&resp.value[..]);
-                    let val = bufr.read_u64::<BigEndian>()?;
-                    results.insert(key, val);
-                }
-                None => {}
+            if let Some(key) = opaques.get(&resp.header.opaque) {
+                let mut bufr = BufReader::new(&resp.value[..]);
+                let val = bufr.read_u64::<BigEndian>()?;
+                results.insert(key, val);
             }
         }
     }
 
     fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>> {
         for key in keys.iter() {
-            let req_header =
-                RequestHeader::from_payload(Command::GetKeyQuietly, DataType::RawBytes, 0, 0, 0, *key, &[], &[]);
+            let req_header = RequestHeader::from_payload(
+                Command::GetKeyQuietly,
+                DataType::RawBytes,
+                0,
+                0,
+                0,
+                *key,
+                &[],
+                &[],
+            );
             let req_packet = RequestPacketRef::new(&req_header, &[], *key, &[]);
 
             req_packet.write_to(&mut self.stream)?;
@@ -815,7 +985,13 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
 }
 
 impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
-    fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn set_noreply(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!(
             "Set noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
@@ -850,7 +1026,13 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
         Ok(())
     }
 
-    fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn add_noreply(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!(
             "Add noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
@@ -892,8 +1074,16 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header =
-            RequestHeader::from_payload(Command::DeleteQuietly, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::DeleteQuietly,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -902,7 +1092,13 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
         Ok(())
     }
 
-    fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn replace_noreply(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!(
             "Replace noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
@@ -937,7 +1133,13 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
         Ok(())
     }
 
-    fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()> {
+    fn increment_noreply(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!(
             "Increment noreply key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
@@ -973,7 +1175,13 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
         Ok(())
     }
 
-    fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()> {
+    fn decrement_noreply(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let opaque = random::<u32>();
         debug!(
             "Decrement noreply key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
@@ -1063,7 +1271,14 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
 }
 
 impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
-    fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
+    fn set_cas(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+        cas: u64,
+    ) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
         debug!(
             "Set cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}, cas: {}",
@@ -1081,8 +1296,16 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Set, DataType::RawBytes, 0, opaque, cas, key, &extra, value);
+        let req_header = RequestHeader::from_payload(
+            Command::Set,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &extra,
+            value,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1103,7 +1326,13 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
         }
     }
 
-    fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<u64> {
+    fn add_cas(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
         debug!(
             "Add cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
@@ -1120,8 +1349,16 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Add, DataType::RawBytes, 0, opaque, 0, key, &extra, value);
+        let req_header = RequestHeader::from_payload(
+            Command::Add,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &extra,
+            value,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1142,7 +1379,14 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
         }
     }
 
-    fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
+    fn replace_cas(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+        cas: u64,
+    ) -> MemCachedResult<u64> {
         let opaque = random::<u32>();
         debug!(
             "Replace cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}, cas: {}",
@@ -1160,8 +1404,16 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Replace, DataType::RawBytes, 0, opaque, cas, key, &extra, value);
+        let req_header = RequestHeader::from_payload(
+            Command::Replace,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &extra,
+            value,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1189,7 +1441,16 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header = RequestHeader::from_payload(Command::Get, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Get,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1222,7 +1483,16 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             key,
             str::from_utf8(key).unwrap_or("<not-utf8-key>")
         );
-        let req_header = RequestHeader::from_payload(Command::GetKey, DataType::RawBytes, 0, opaque, 0, key, &[], &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::GetKey,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            key,
+            &[],
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1274,8 +1544,16 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Increment, DataType::RawBytes, 0, opaque, cas, key, &extra, &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Increment,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &extra,
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1325,8 +1603,16 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Decrement, DataType::RawBytes, 0, opaque, cas, key, &extra, &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Decrement,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &extra,
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1359,8 +1645,16 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             value,
             cas
         );
-        let req_header =
-            RequestHeader::from_payload(Command::Append, DataType::RawBytes, 0, opaque, cas, key, &[], value);
+        let req_header = RequestHeader::from_payload(
+            Command::Append,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &[],
+            value,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1390,8 +1684,16 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             value,
             cas
         );
-        let req_header =
-            RequestHeader::from_payload(Command::Prepend, DataType::RawBytes, 0, opaque, cas, key, &[], value);
+        let req_header = RequestHeader::from_payload(
+            Command::Prepend,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &[],
+            value,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], key, value);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1427,8 +1729,16 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
             extra_buf.write_u32::<BigEndian>(expiration)?;
         }
 
-        let req_header =
-            RequestHeader::from_payload(Command::Touch, DataType::RawBytes, 0, opaque, cas, key, &extra, &[]);
+        let req_header = RequestHeader::from_payload(
+            Command::Touch,
+            DataType::RawBytes,
+            0,
+            opaque,
+            cas,
+            key,
+            &extra,
+            &[],
+        );
         let req_packet = RequestPacketRef::new(&req_header, &extra, key, &[]);
 
         req_packet.write_to(&mut self.stream)?;
@@ -1454,7 +1764,16 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
     fn list_mechanisms(&mut self) -> MemCachedResult<Vec<String>> {
         let opaque = random::<u32>();
         debug!("List mechanisms");
-        let req_header = RequestHeader::new(Command::SaslListMechanisms, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
+        let req_header = RequestHeader::new(
+            Command::SaslListMechanisms,
+            DataType::RawBytes,
+            0,
+            opaque,
+            0,
+            0,
+            0,
+            0,
+        );
         let req_packet = RequestPacketRef::new(&req_header, &[], &[], &[]);
         req_packet.write_to(&mut self.stream)?;
         self.stream.flush()?;
@@ -1553,13 +1872,15 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
 
 #[cfg(test)]
 mod test {
-    use proto::{BinaryProto, CasOperation, MultiOperation, NoReplyOperation, Operation, ServerOperation};
+    use crate::proto::{
+        BinaryProto, CasOperation, MultiOperation, NoReplyOperation, Operation, ServerOperation,
+    };
     use std::collections::{BTreeMap, HashMap};
     use std::net::TcpStream;
 
     use bufstream::BufStream;
 
-    const SERVER_ADDR: &'static str = "127.0.0.1:11211";
+    const SERVER_ADDR: &str = "127.0.0.1:11211";
 
     fn get_client() -> BinaryProto<BufStream<TcpStream>> {
         let stream = TcpStream::connect(SERVER_ADDR).unwrap();
@@ -1568,24 +1889,27 @@ mod test {
 
     #[test]
     fn test_set_get_delete() {
-        const KEY: &'static [u8] = b"test:set_get_delete";
-        const VAL: &'static [u8] = b"world";
+        const KEY: &[u8] = b"test:set_get_delete";
+        const VAL: &[u8] = b"world";
 
         let mut client = get_client();
-        client.set(KEY, VAL, 0xdeadbeef, 120).unwrap();
+        client.set(KEY, VAL, 0xdead_beef, 120).unwrap();
 
         let get_resp = client.get(KEY);
-        assert_eq!(get_resp.unwrap(), (VAL.to_vec(), 0xdeadbeef));
+        assert_eq!(get_resp.unwrap(), (VAL.to_vec(), 0xdead_beef));
 
         let getk_resp = client.getk(KEY);
-        assert_eq!(getk_resp.unwrap(), (KEY.to_vec(), VAL.to_vec(), 0xdeadbeef));
+        assert_eq!(
+            getk_resp.unwrap(),
+            (KEY.to_vec(), VAL.to_vec(), 0xdead_beef)
+        );
 
         client.delete(KEY).unwrap();
     }
 
     #[test]
     fn test_incr_decr() {
-        const KEY: &'static [u8] = b"test:incr_decr";
+        const KEY: &[u8] = b"test:incr_decr";
 
         let mut client = get_client();
         let _ = client.delete(KEY);
@@ -1641,20 +1965,20 @@ mod test {
 
     #[test]
     fn test_add() {
-        const KEY: &'static [u8] = b"test:add";
-        const INIT_VAL: &'static [u8] = b"initial";
-        const ADD_VAL: &'static [u8] = b"added";
+        const KEY: &[u8] = b"test:add";
+        const INIT_VAL: &[u8] = b"initial";
+        const ADD_VAL: &[u8] = b"added";
 
         let mut client = get_client();
 
         let _ = client.delete(KEY);
 
-        client.add(KEY, INIT_VAL, 0xdeadbeef, 120).unwrap();
+        client.add(KEY, INIT_VAL, 0xdead_beef, 120).unwrap();
 
         {
             let get_resp = client.get(KEY);
-            assert_eq!(get_resp.unwrap(), (INIT_VAL.to_vec(), 0xdeadbeef));
-            client.add(KEY, ADD_VAL, 0xdeadbeef, 120).unwrap_err();
+            assert_eq!(get_resp.unwrap(), (INIT_VAL.to_vec(), 0xdead_beef));
+            client.add(KEY, ADD_VAL, 0xdead_beef, 120).unwrap_err();
         }
 
         client.delete(KEY).unwrap();
@@ -1664,11 +1988,13 @@ mod test {
     fn test_replace() {
         let mut client = get_client();
         client
-            .replace(b"test:replace_key", b"replaced", 0xdeadbeef, 120)
+            .replace(b"test:replace_key", b"replaced", 0xdead_beef, 120)
             .unwrap_err();
-        client.add(b"test:replace_key", b"just_add", 0xdeadbeef, 120).unwrap();
         client
-            .replace(b"test:replace_key", b"replaced", 0xdeadbeef, 120)
+            .add(b"test:replace_key", b"just_add", 0xdead_beef, 120)
+            .unwrap();
+        client
+            .replace(b"test:replace_key", b"replaced", 0xdead_beef, 120)
             .unwrap();
         client.delete(b"test:replace_key").unwrap();
     }
@@ -1677,18 +2003,28 @@ mod test {
     fn test_append_prepend() {
         let mut client = get_client();
         client.append(b"test:append_key", b"appended").unwrap_err();
-        client.prepend(b"test:append_key", b"prepended").unwrap_err();
+        client
+            .prepend(b"test:append_key", b"prepended")
+            .unwrap_err();
 
         {
-            client.add(b"test:append_key", b"just_add", 0xdeadbeef, 120).unwrap();
+            client
+                .add(b"test:append_key", b"just_add", 0xdead_beef, 120)
+                .unwrap();
             client.append(b"test:append_key", b"appended").unwrap();
 
             let get_resp = client.get(b"test:append_key");
-            assert_eq!(get_resp.unwrap(), (b"just_addappended".to_vec(), 0xdeadbeef));
+            assert_eq!(
+                get_resp.unwrap(),
+                (b"just_addappended".to_vec(), 0xdead_beef)
+            );
 
             client.prepend(b"test:append_key", b"prepended").unwrap();
             let get_resp = client.get(b"test:append_key");
-            assert_eq!(get_resp.unwrap(), (b"prependedjust_addappended".to_vec(), 0xdeadbeef));
+            assert_eq!(
+                get_resp.unwrap(),
+                (b"prependedjust_addappended".to_vec(), 0xdead_beef)
+            );
         }
 
         client.delete(b"test:append_key").unwrap();
@@ -1704,7 +2040,7 @@ mod test {
     fn test_touch() {
         let mut client = get_client();
         client.touch(b"test:touch", 120).unwrap_err();
-        client.add(b"test:touch", b"val", 0xcafebabe, 100).unwrap();
+        client.add(b"test:touch", b"val", 0xcafe_babe, 100).unwrap();
         client.touch(b"test:touch", 120).unwrap();
         client.delete(b"test:touch").unwrap();
     }
@@ -1714,42 +2050,63 @@ mod test {
         let mut client = get_client();
 
         let mut data = BTreeMap::new();
-        data.insert(&b"test:multi_hello1"[..], (&b"world1"[..], 0xdeadbeef, 120));
-        data.insert(&b"test:multi_hello2"[..], (&b"world2"[..], 0xdeadbeef, 120));
-        data.insert(&b"test:multi_num1"[..], (&b"100"[..], 0xdeadbeef, 120));
-        data.insert(&b"test:multi_num2"[..], (&b"200"[..], 0xdeadbeef, 120));
-        data.insert(&b"test:multi_lastone"[..], (&b"last!"[..], 0xdeadbeef, 120));
+        data.insert(
+            &b"test:multi_hello1"[..],
+            (&b"world1"[..], 0xdead_beef, 120),
+        );
+        data.insert(
+            &b"test:multi_hello2"[..],
+            (&b"world2"[..], 0xdead_beef, 120),
+        );
+        data.insert(&b"test:multi_num1"[..], (&b"100"[..], 0xdead_beef, 120));
+        data.insert(&b"test:multi_num2"[..], (&b"200"[..], 0xdead_beef, 120));
+        data.insert(
+            &b"test:multi_lastone"[..],
+            (&b"last!"[..], 0xdead_beef, 120),
+        );
 
         client.set_multi(data).unwrap();
 
         let get_resp_map = client
-            .get_multi(&[b"test:multi_hello1", b"test:multi_hello2", b"test:multi_lastone"])
+            .get_multi(&[
+                b"test:multi_hello1",
+                b"test:multi_hello2",
+                b"test:multi_lastone",
+            ])
             .unwrap();
         assert_eq!(
             get_resp_map.get(&b"test:multi_hello1".to_vec()),
-            Some(&(b"world1".to_vec(), 0xdeadbeef))
+            Some(&(b"world1".to_vec(), 0xdead_beef))
         );
         assert_eq!(
             get_resp_map.get(&b"test:multi_hello2".to_vec()),
-            Some(&(b"world2".to_vec(), 0xdeadbeef))
+            Some(&(b"world2".to_vec(), 0xdead_beef))
         );
         assert_eq!(
             get_resp_map.get(&b"test:multi_lastone".to_vec()),
-            Some(&(b"last!".to_vec(), 0xdeadbeef))
+            Some(&(b"last!".to_vec(), 0xdead_beef))
         );
 
         client
-            .delete_multi(&[b"test:multi_hello1", b"test:multi_hello2", b"test:multi_num3"])
+            .delete_multi(&[
+                b"test:multi_hello1",
+                b"test:multi_hello2",
+                b"test:multi_num3",
+            ])
             .unwrap();
 
         let get_resp_map = client
-            .get_multi(&[b"test:multi_hello1", b"test:multi_hello2", b"test:multi_lastone"])
+            .get_multi(&[
+                b"test:multi_hello1",
+                b"test:multi_hello2",
+                b"test:multi_lastone",
+            ])
             .unwrap();
         assert_eq!(get_resp_map.get(&b"test:multi_hello1".to_vec()), None);
         assert_eq!(get_resp_map.get(&b"test:multi_hello2".to_vec()), None);
         assert_eq!(
             get_resp_map.get(&b"test:multi_lastone".to_vec()),
-            Some(&(b"last!".to_vec(), 0xdeadbeef))
+            Some(&(b"last!".to_vec(), 0xdead_beef))
         );
 
         let mut data = HashMap::new();
@@ -1763,18 +2120,20 @@ mod test {
             .unwrap();
         assert_eq!(
             get_resp_map.get(&b"test:multi_num1".to_vec()),
-            Some(&(b"110".to_vec(), 0xdeadbeef))
+            Some(&(b"110".to_vec(), 0xdead_beef))
         );
         assert_eq!(
             get_resp_map.get(&b"test:multi_num2".to_vec()),
-            Some(&(b"220".to_vec(), 0xdeadbeef))
+            Some(&(b"220".to_vec(), 0xdead_beef))
         );
         assert_eq!(
             get_resp_map.get(&b"test:multi_num3".to_vec()),
             Some(&(b"50".to_vec(), 0x0))
         );
 
-        client.delete_multi(&[b"lastone", b"not_exists!!!!"]).unwrap();
+        client
+            .delete_multi(&[b"lastone", b"not_exists!!!!"])
+            .unwrap();
     }
 
     #[test]
@@ -1788,20 +2147,22 @@ mod test {
 
         let _ = client.delete(key);
 
-        client.add_noreply(key, add_val, 0xdeadbeef, 120).unwrap();
+        client.add_noreply(key, add_val, 0xdead_beef, 120).unwrap();
 
         let get_resp = client.get(key);
-        assert_eq!(get_resp.unwrap(), (add_val.to_vec(), 0xdeadbeef));
+        assert_eq!(get_resp.unwrap(), (add_val.to_vec(), 0xdead_beef));
 
-        client.set_noreply(key, set_val, 0xdeadbeef, 120).unwrap();
-
-        let get_resp = client.get(key);
-        assert_eq!(get_resp.unwrap(), (set_val.to_vec(), 0xdeadbeef));
-
-        client.replace_noreply(key, rep_val, 0xcafebabe, 120).unwrap();
+        client.set_noreply(key, set_val, 0xdead_beef, 120).unwrap();
 
         let get_resp = client.get(key);
-        assert_eq!(get_resp.unwrap(), (rep_val.to_vec(), 0xcafebabe));
+        assert_eq!(get_resp.unwrap(), (set_val.to_vec(), 0xdead_beef));
+
+        client
+            .replace_noreply(key, rep_val, 0xcafe_babe, 120)
+            .unwrap();
+
+        let get_resp = client.get(key);
+        assert_eq!(get_resp.unwrap(), (rep_val.to_vec(), 0xcafe_babe));
 
         client.delete(key).unwrap();
     }
@@ -1815,25 +2176,31 @@ mod test {
 
         let mut client = get_client();
 
-        let add_cas = client.add_cas(key, add_val, 0xdeadbeef, 120).unwrap();
+        let add_cas = client.add_cas(key, add_val, 0xdead_beef, 120).unwrap();
 
         {
-            client.set_cas(key, set_val, 0xdeadbeef, 120, add_cas + 1).unwrap_err();
+            client
+                .set_cas(key, set_val, 0xdead_beef, 120, add_cas + 1)
+                .unwrap_err();
 
             let (_, _, get_cas) = client.get_cas(key).unwrap();
             assert_eq!(get_cas, add_cas);
 
             client
-                .replace_cas(key, rep_val, 0xdeadbeef, 120, add_cas + 1)
+                .replace_cas(key, rep_val, 0xdead_beef, 120, add_cas + 1)
                 .unwrap_err();
         }
 
         {
-            let set_cas = client.set_cas(key, set_val, 0xdeadbeef, 120, add_cas).unwrap();
+            let set_cas = client
+                .set_cas(key, set_val, 0xdead_beef, 120, add_cas)
+                .unwrap();
             let (_, _, get_cas) = client.get_cas(key).unwrap();
             assert_eq!(get_cas, set_cas);
 
-            client.replace_cas(key, rep_val, 0xdeadbeef, 120, set_cas).unwrap();
+            client
+                .replace_cas(key, rep_val, 0xdead_beef, 120, set_cas)
+                .unwrap();
         }
 
         client.delete(key).unwrap();
@@ -1848,11 +2215,15 @@ mod test {
 
         let (_, incr_cas) = client.increment_cas(key, 0, 100, 120, 0).unwrap();
 
-        client.increment_cas(key, 0, 10, 120, incr_cas + 1).unwrap_err();
+        client
+            .increment_cas(key, 0, 10, 120, incr_cas + 1)
+            .unwrap_err();
 
         let (_, incr_cas) = client.increment_cas(key, 0, 10, 120, incr_cas).unwrap();
 
-        client.decrement_cas(key, 0, 10, 120, incr_cas + 1).unwrap_err();
+        client
+            .decrement_cas(key, 0, 10, 120, incr_cas + 1)
+            .unwrap_err();
         client.decrement_cas(key, 0, 10, 120, incr_cas).unwrap();
 
         client.delete(key).unwrap();
@@ -1860,13 +2231,15 @@ mod test {
 
     #[test]
     fn test_append_prepend_cas() {
-        const KEY: &'static [u8] = b"test:append_prepend_cas";
+        const KEY: &[u8] = b"test:append_prepend_cas";
         let mut client = get_client();
 
         let _ = client.delete(KEY);
 
         let set_cas = client.set_cas(KEY, b"appended", 0, 120, 0).unwrap();
-        client.append_cas(KEY, b"appended", set_cas + 1).unwrap_err();
+        client
+            .append_cas(KEY, b"appended", set_cas + 1)
+            .unwrap_err();
 
         let ap_cas = client.append_cas(KEY, b"appended", set_cas).unwrap();
         client.prepend_cas(KEY, b"prepend", ap_cas + 1).unwrap_err();
@@ -1885,12 +2258,12 @@ mod test {
 
         let _ = client.delete(key);
 
-        client.set_noreply(key, set_val, 0xdeadbeef, 120).unwrap();
+        client.set_noreply(key, set_val, 0xdead_beef, 120).unwrap();
 
         // Should failed, because key is already set
-        client.add_noreply(key, add_val, 0xdeadbeef, 120).unwrap();
+        client.add_noreply(key, add_val, 0xdead_beef, 120).unwrap();
 
         let get_resp = client.get(key);
-        assert_eq!(get_resp.unwrap(), (set_val.to_vec(), 0xdeadbeef));
+        assert_eq!(get_resp.unwrap(), (set_val.to_vec(), 0xdead_beef));
     }
 }

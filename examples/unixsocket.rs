@@ -13,13 +13,19 @@ fn main() {
     info!("Using servers: {:?} with Binary protocol", servers);
     let mut client = Client::connect(&servers, ProtoType::Binary).unwrap();
 
-    client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();
+    client.set(b"Foo", b"Bar", 0xdead_beef, 2).unwrap();
     let (value, flags) = client.get(b"Foo").unwrap();
     assert_eq!(&value[..], b"Bar");
-    assert_eq!(flags, 0xdeadbeef);
+    assert_eq!(flags, 0xdead_beef);
 
-    client.set_noreply(b"key:dontreply", b"1", 0x00000001, 20).unwrap();
+    client
+        .set_noreply(b"key:dontreply", b"1", 0x00_00_00_01, 20)
+        .unwrap();
 
-    let (_, cas_val) = client.increment_cas(b"key:numerical", 10, 1, 20, 0).unwrap();
-    client.increment_cas(b"key:numerical", 1, 1, 20, cas_val).unwrap();
+    let (_, cas_val) = client
+        .increment_cas(b"key:numerical", 10, 1, 20, 0)
+        .unwrap();
+    client
+        .increment_cas(b"key:numerical", 1, 1, 20, cas_val)
+        .unwrap();
 }

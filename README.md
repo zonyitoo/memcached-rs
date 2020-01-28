@@ -1,14 +1,14 @@
 # memcached-rs
 
 [![Build Status](https://travis-ci.org/zonyitoo/memcached-rs.svg)](https://travis-ci.org/zonyitoo/memcached-rs)
+[![crates.io](https://img.shields.io/crates/v/memcached-rs.svg)](https://crates.io/crates/memcached-rs)
+[![dependency status](https://deps.rs/repo/github/zonyitoo/memcached-rs/status.svg)](https://deps.rs/repo/github/zonyitoo/memcached-rs)
 
 Memcached library in Rust
 
 ## Usage
 
 ```rust
-extern crate memcached;
-
 use std::collections::TreeMap;
 
 use memcached::Client;
@@ -39,13 +39,13 @@ Run `cargo doc --open` for more details.
 TCP connections support `PLAIN` SASL authentication:
 
 ```rust
-extern crate memcached;
-
 use memcached::proto::{Operation, ProtoType};
 use memcached::Client;
 
 fn main() {
-    let servers = [("tcp://my-sasl-memcached-server.com:11211", 1)];
+    let servers = [
+        ("tcp://my-sasl-memcached-server.com:11211", 1)
+    ];
     let mut client = Client::connect_sasl(&servers, ProtoType::Binary, "my-username", "my-password").unwrap();
 
     client.set(b"Foo", b"Bar", 0xdeadbeef, 2).unwrap();

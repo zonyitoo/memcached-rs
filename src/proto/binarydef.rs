@@ -36,12 +36,13 @@
 //   Total 24 bytes
 
 #![allow(dead_code)]
+#![allow(clippy::too_many_arguments)]
 
 use std::io::{self, Read, Write};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 mod consts {
     pub const MAGIC_REQUEST:  u8 = 0x80;
     pub const MAGIC_RESPONSE: u8 = 0x81;
@@ -130,7 +131,7 @@ mod consts {
 /// Memcached response status
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u16)]
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 pub enum Status {
     NoError                           = consts::STATUS_NO_ERROR,
     KeyNotFound                       = consts::STATUS_KEY_NOT_FOUND,
@@ -155,14 +156,14 @@ pub enum Status {
 impl Status {
     /// Get the binary code of the status
     #[inline]
-    pub fn to_u16(&self) -> u16 {
-        *self as u16
+    pub fn to_u16(self) -> u16 {
+        self as u16
     }
 
     /// Generate a Status from binary code
     #[inline]
+    #[rustfmt::skip]
     pub fn from_u16(code: u16) -> Option<Status> {
-        #[cfg_attr(rustfmt, rustfmt_skip)]
         match code {
             consts::STATUS_NO_ERROR                             => Some(Status::NoError),
             consts::STATUS_KEY_NOT_FOUND                        => Some(Status::KeyNotFound),
@@ -188,9 +189,9 @@ impl Status {
 
     /// Get a short description
     #[inline]
-    pub fn desc(&self) -> &'static str {
-        #[cfg_attr(rustfmt, rustfmt_skip)]
-        match *self {
+    #[rustfmt::skip]
+    pub fn desc(self) -> &'static str {
+        match self {
             Status::NoError                           => "no error",
             Status::KeyNotFound                       => "key not found",
             Status::KeyExists                         => "key exists",
@@ -215,7 +216,7 @@ impl Status {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 pub enum Command {
     Get                = consts::OPCODE_GET,
     Set                = consts::OPCODE_SET,
@@ -279,13 +280,13 @@ pub enum Command {
 
 impl Command {
     #[inline]
-    fn to_u8(&self) -> u8 {
-        *self as u8
+    fn to_u8(self) -> u8 {
+        self as u8
     }
 
     #[inline]
+    #[rustfmt::skip]
     fn from_u8(code: u8) -> Option<Command> {
-        #[cfg_attr(rustfmt, rustfmt_skip)]
         match code {
             consts::OPCODE_GET                  => Some(Command::Get),
             consts::OPCODE_SET                  => Some(Command::Set),
@@ -357,8 +358,8 @@ pub enum DataType {
 
 impl DataType {
     #[inline]
-    fn to_u8(&self) -> u8 {
-        match *self {
+    fn to_u8(self) -> u8 {
+        match self {
             DataType::RawBytes => consts::DATA_TYPE_RAW_BYTES,
         }
     }
@@ -413,13 +414,13 @@ impl RequestHeader {
     ) -> RequestHeader {
         RequestHeader {
             command: cmd,
-            key_len: key_len,
-            extra_len: extra_len,
+            key_len,
+            extra_len,
             data_type: dtype,
             vbucket_id: vbid,
-            body_len: body_len,
-            opaque: opaque,
-            cas: cas,
+            body_len,
+            opaque,
+            cas,
         }
     }
 
@@ -512,8 +513,8 @@ pub struct ResponseHeader {
 
 impl ResponseHeader {
     pub fn new(
-        cmd: Command,
-        dtype: DataType,
+        command: Command,
+        data_type: DataType,
         status: Status,
         opaque: u32,
         cas: u64,
@@ -522,14 +523,14 @@ impl ResponseHeader {
         body_len: u32,
     ) -> ResponseHeader {
         ResponseHeader {
-            command: cmd,
-            key_len: key_len,
-            extra_len: extra_len,
-            data_type: dtype,
-            status: status,
-            body_len: body_len,
-            opaque: opaque,
-            cas: cas,
+            command,
+            key_len,
+            extra_len,
+            data_type,
+            status,
+            body_len,
+            opaque,
+            cas,
         }
     }
 
@@ -547,7 +548,9 @@ impl ResponseHeader {
         let extra_len = extra.len() as u8;
         let body_len = (key.len() + extra.len() + value.len()) as u32;
 
-        ResponseHeader::new(cmd, dtype, status, opaque, cas, key_len, extra_len, body_len)
+        ResponseHeader::new(
+            cmd, dtype, status, opaque, cas, key_len, extra_len, body_len,
+        )
     }
 
     #[inline]
@@ -615,10 +618,19 @@ impl RequestPacket {
         value: Vec<u8>,
     ) -> RequestPacket {
         RequestPacket {
-            header: RequestHeader::from_payload(cmd, dtype, vbid, opaque, cas, &key[..], &extra[..], &value[..]),
-            extra: extra,
-            key: key,
-            value: value,
+            header: RequestHeader::from_payload(
+                cmd,
+                dtype,
+                vbid,
+                opaque,
+                cas,
+                &key[..],
+                &extra[..],
+                &value[..],
+            ),
+            extra,
+            key,
+            value,
         }
     }
 
@@ -659,15 +671,20 @@ impl RequestPacket {
         };
 
         Ok(RequestPacket {
-            header: header,
-            extra: extra,
-            key: key,
-            value: value,
+            header,
+            extra,
+            key,
+            value,
         })
     }
 
-    pub fn as_ref<'a>(&'a self) -> RequestPacketRef<'a> {
-        RequestPacketRef::new(&self.header, &self.extra[..], &self.key[..], &self.value[..])
+    pub fn as_ref(&self) -> RequestPacketRef<'_> {
+        RequestPacketRef::new(
+            &self.header,
+            &self.extra[..],
+            &self.key[..],
+            &self.value[..],
+        )
     }
 }
 
@@ -680,12 +697,17 @@ pub struct RequestPacketRef<'a> {
 }
 
 impl<'a> RequestPacketRef<'a> {
-    pub fn new(header: &'a RequestHeader, extra: &'a [u8], key: &'a [u8], value: &'a [u8]) -> RequestPacketRef<'a> {
+    pub fn new(
+        header: &'a RequestHeader,
+        extra: &'a [u8],
+        key: &'a [u8],
+        value: &'a [u8],
+    ) -> RequestPacketRef<'a> {
         RequestPacketRef {
-            header: header,
-            extra: extra,
-            key: key,
-            value: value,
+            header,
+            extra,
+            key,
+            value,
         }
     }
 
@@ -720,10 +742,19 @@ impl ResponsePacket {
         value: Vec<u8>,
     ) -> ResponsePacket {
         ResponsePacket {
-            header: ResponseHeader::from_payload(cmd, dtype, status, opaque, cas, &key[..], &extra[..], &value[..]),
-            extra: extra,
-            key: key,
-            value: value,
+            header: ResponseHeader::from_payload(
+                cmd,
+                dtype,
+                status,
+                opaque,
+                cas,
+                &key[..],
+                &extra[..],
+                &value[..],
+            ),
+            extra,
+            key,
+            value,
         }
     }
 
@@ -764,10 +795,10 @@ impl ResponsePacket {
         };
 
         Ok(ResponsePacket {
-            header: header,
-            extra: extra,
-            key: key,
-            value: value,
+            header,
+            extra,
+            key,
+            value,
         })
     }
 }
@@ -780,12 +811,17 @@ pub struct ResponsePacketRef<'a> {
 }
 
 impl<'a> ResponsePacketRef<'a> {
-    pub fn new(header: &'a ResponseHeader, extra: &'a [u8], key: &'a [u8], value: &'a [u8]) -> ResponsePacketRef<'a> {
+    pub fn new(
+        header: &'a ResponseHeader,
+        extra: &'a [u8],
+        key: &'a [u8],
+        value: &'a [u8],
+    ) -> ResponsePacketRef<'a> {
         ResponsePacketRef {
-            header: header,
-            extra: extra,
-            key: key,
-            value: value,
+            header,
+            extra,
+            key,
+            value,
         }
     }
 
@@ -805,8 +841,8 @@ mod test {
     use std::io::Write;
     use std::net::TcpStream;
 
-    use proto;
-    use proto::binarydef::{Command, DataType, RequestPacket, ResponsePacket};
+    use crate::proto;
+    use crate::proto::binarydef::{Command, DataType, RequestPacket, ResponsePacket};
 
     use bufstream::BufStream;
 

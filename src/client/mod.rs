@@ -24,21 +24,25 @@ use bufstream::BufStream;
 #[cfg(unix)]
 use unix_socket::UnixStream;
 
-use proto::{self, MemCachedResult, AuthResponse};
-use proto::{CasOperation, MultiOperation, NoReplyOperation, Operation, Proto};
+use crate::proto::{self, AuthResponse, MemCachedResult};
+use crate::proto::{CasOperation, MultiOperation, NoReplyOperation, Operation, Proto};
 
 struct Sasl<'a> {
     username: &'a str,
-    password: &'a str
+    password: &'a str,
 }
 
 struct Server {
-    pub proto: Box<Proto + Send>,
+    pub proto: Box<dyn Proto + Send>,
     addr: String,
 }
 
 impl Server {
-    fn connect(addr: String, protocol: proto::ProtoType, o_sasl: &Option<Sasl>) -> io::Result<Server> {
+    fn connect(
+        addr: String,
+        protocol: proto::ProtoType,
+        o_sasl: &Option<Sasl>,
+    ) -> io::Result<Server> {
         let proto = {
             let mut split = addr.split("://");
             match protocol {
@@ -47,16 +51,17 @@ impl Server {
                         let stream = TcpStream::connect(addr)?;
                         stream.set_nodelay(true)?;
                         let mut proto = Box::new(proto::BinaryProto::new(BufStream::new(stream)))
-                                            as Box<Proto + Send>;
+                            as Box<dyn Proto + Send>;
                         if let Some(sasl) = o_sasl {
                             let auth_str = format!("\x00{}\x00{}", sasl.username, sasl.password);
                             match proto.auth_start("PLAIN", auth_str.as_bytes()) {
                                 Err(err) => return Err(io::Error::new(io::ErrorKind::Other, err)),
                                 Ok(AuthResponse::Succeeded) => (),
                                 Ok(resp) => {
-                                    let msg = format!("SASL auth failed with AuthResponse: {:?}", resp);
-                                    return Err(io::Error::new(io::ErrorKind::Other, msg))
-                                },
+                                    let msg =
+                                        format!("SASL auth failed with AuthResponse: {:?}", resp);
+                                    return Err(io::Error::new(io::ErrorKind::Other, msg));
+                                }
                             }
                         }
                         proto
@@ -64,7 +69,8 @@ impl Server {
                     #[cfg(unix)]
                     (Some("unix"), Some(addr)) => {
                         let stream = UnixStream::connect(&Path::new(addr))?;
-                        Box::new(proto::BinaryProto::new(BufStream::new(stream))) as Box<Proto + Send>
+                        Box::new(proto::BinaryProto::new(BufStream::new(stream)))
+                            as Box<dyn Proto + Send>
                     }
                     (Some(prot), _) => {
                         panic!("Unsupported protocol: {}", prot);
@@ -73,10 +79,7 @@ impl Server {
                 },
             }
         };
-        Ok(Server {
-            proto: proto,
-            addr: addr,
-        })
+        Ok(Server { proto, addr })
     }
 }
 
@@ -142,11 +145,20 @@ impl Client {
     /// as a array of tuples in this form
     ///
     /// `(address, weight)`.
-    pub fn connect_sasl<S: ToString>(svrs: &[(S, usize)], p: proto::ProtoType, username: &str, password: &str) -> io::Result<Client> {
-        Client::conn(svrs, p, Some(Sasl{username: username, password: password}))
+    pub fn connect_sasl<S: ToString>(
+        svrs: &[(S, usize)],
+        p: proto::ProtoType,
+        username: &str,
+        password: &str,
+    ) -> io::Result<Client> {
+        Client::conn(svrs, p, Some(Sasl { username, password }))
     }
 
-    fn conn<S: ToString>(svrs: &[(S, usize)], p: proto::ProtoType, sasl: Option<Sasl>) -> io::Result<Client> {
+    fn conn<S: ToString>(
+        svrs: &[(S, usize)],
+        p: proto::ProtoType,
+        sasl: Option<Sasl>,
+    ) -> io::Result<Client> {
         assert!(!svrs.is_empty(), "Server list should not be empty");
 
         let mut servers = ConsistentHash::new();
@@ -155,7 +167,7 @@ impl Client {
             servers.add(&ServerRef(Rc::new(RefCell::new(svr))), *weight);
         }
 
-        Ok(Client { servers: servers })
+        Ok(Client { servers })
     }
 
     fn find_server_by_key<'a>(&'a mut self, key: &[u8]) -> &'a mut ServerRef {
@@ -164,12 +176,24 @@ impl Client {
 }
 
 impl Operation for Client {
-    fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn set(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
         server.borrow_mut().proto.set(key, value, flags, expiration)
     }
 
-    fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn add(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
         server.borrow_mut().proto.add(key, value, flags, expiration)
     }
@@ -179,9 +203,18 @@ impl Operation for Client {
         server.borrow_mut().proto.delete(key)
     }
 
-    fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn replace(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.replace(key, value, flags, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .replace(key, value, flags, expiration)
     }
 
     fn get(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32)> {
@@ -194,14 +227,32 @@ impl Operation for Client {
         server.borrow_mut().proto.getk(key)
     }
 
-    fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
+    fn increment(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+    ) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.increment(key, amount, initial, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .increment(key, amount, initial, expiration)
     }
 
-    fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64> {
+    fn decrement(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+    ) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.increment(key, amount, initial, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .increment(key, amount, initial, expiration)
     }
 
     fn append(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
@@ -221,14 +272,32 @@ impl Operation for Client {
 }
 
 impl NoReplyOperation for Client {
-    fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn set_noreply(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.set_noreply(key, value, flags, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .set_noreply(key, value, flags, expiration)
     }
 
-    fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn add_noreply(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.add_noreply(key, value, flags, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .add_noreply(key, value, flags, expiration)
     }
 
     fn delete_noreply(&mut self, key: &[u8]) -> MemCachedResult<()> {
@@ -236,12 +305,27 @@ impl NoReplyOperation for Client {
         server.borrow_mut().proto.delete_noreply(key)
     }
 
-    fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()> {
+    fn replace_noreply(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.replace_noreply(key, value, flags, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .replace_noreply(key, value, flags, expiration)
     }
 
-    fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()> {
+    fn increment_noreply(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
         server
             .borrow_mut()
@@ -249,7 +333,13 @@ impl NoReplyOperation for Client {
             .increment_noreply(key, amount, initial, expiration)
     }
 
-    fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()> {
+    fn decrement_noreply(
+        &mut self,
+        key: &[u8],
+        amount: u64,
+        initial: u64,
+        expiration: u32,
+    ) -> MemCachedResult<()> {
         let server = self.find_server_by_key(key);
         server
             .borrow_mut()
@@ -269,17 +359,43 @@ impl NoReplyOperation for Client {
 }
 
 impl CasOperation for Client {
-    fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
+    fn set_cas(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+        cas: u64,
+    ) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.set_cas(key, value, flags, expiration, cas)
+        server
+            .borrow_mut()
+            .proto
+            .set_cas(key, value, flags, expiration, cas)
     }
 
-    fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<u64> {
+    fn add_cas(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+    ) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
-        server.borrow_mut().proto.add_cas(key, value, flags, expiration)
+        server
+            .borrow_mut()
+            .proto
+            .add_cas(key, value, flags, expiration)
     }
 
-    fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64> {
+    fn replace_cas(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        flags: u32,
+        expiration: u32,
+        cas: u64,
+    ) -> MemCachedResult<u64> {
         let server = self.find_server_by_key(key);
         server
             .borrow_mut()
@@ -371,8 +487,8 @@ impl MultiOperation for Client {
 
 #[cfg(all(test, feature = "nightly"))]
 mod test {
-    use client::Client;
-    use proto::{NoReplyOperation, Operation, ProtoType};
+    use super::Client;
+    use crate::proto::{NoReplyOperation, Operation, ProtoType};
     use rand::random;
     use test::Bencher;
 
@@ -385,7 +501,8 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(64);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+        let mut client =
+            Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, &val[..], 0, 2));
     }
@@ -395,7 +512,8 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(64);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+        let mut client =
+            Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
@@ -405,7 +523,8 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(512);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+        let mut client =
+            Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, &val[..], 0, 2));
     }
@@ -415,7 +534,8 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(512);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+        let mut client =
+            Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
@@ -425,7 +545,8 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(1024);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+        let mut client =
+            Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, &val[..], 0, 2));
     }
@@ -435,7 +556,8 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(1024);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+        let mut client =
+            Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
@@ -445,7 +567,8 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(4096);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+        let mut client =
+            Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, &val[..], 0, 2));
     }
@@ -455,7 +578,8 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(4096);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+        let mut client =
+            Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }
@@ -465,7 +589,8 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(16384);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+        let mut client =
+            Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set(key, &val[..], 0, 2));
     }
@@ -475,7 +600,8 @@ mod test {
         let key = b"test:test_bench";
         let val = generate_data(16384);
 
-        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+        let mut client =
+            Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, &val[..], 0, 2));
     }

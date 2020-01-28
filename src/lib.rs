@@ -9,19 +9,10 @@
 
 #![crate_type = "lib"]
 #![crate_name = "memcached"]
+#![allow(clippy::type_complexity)] // For `crate::proto::MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>>`
 #![cfg_attr(feature = "nightly", feature(test))]
 #[cfg(feature = "nightly")]
 extern crate test;
-
-extern crate bufstream;
-extern crate byteorder;
-extern crate conhash;
-#[macro_use]
-extern crate log;
-extern crate rand;
-extern crate semver;
-#[cfg(unix)]
-extern crate unix_socket;
 
 pub use client::Client;
 
