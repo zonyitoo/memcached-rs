@@ -1,12 +1,15 @@
 language: rust
-rust:
-    - stable
-    - nightly
+jobs:
+    include:
+        - rust: stable
+          env: FEATURES=""
+        - rust: nightly
+          env: FEATURES="--features nightly"
 
 services:
     - memcached
 
 script:
-    - cargo check --features nightly --all --all-targets
-    - cargo build --features nightly
-    - cargo test --features nightly --no-fail-fast
+    - cargo check $FEATURES --all --all-targets
+    - cargo build $FEATURES
+    - cargo test $FEATURES --no-fail-fast
