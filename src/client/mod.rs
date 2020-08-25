@@ -489,11 +489,10 @@ impl MultiOperation for Client {
 mod test {
     use super::Client;
     use crate::proto::{NoReplyOperation, Operation, ProtoType};
-    use rand::random;
     use test::Bencher;
 
     fn generate_data(len: usize) -> Vec<u8> {
-        (0..len).map(|_| random()).collect()
+        (0..len).map(|_| fastrand::u8(..)).collect()
     }
 
     #[bench]
