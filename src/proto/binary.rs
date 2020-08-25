@@ -8,7 +8,6 @@
 // according to those terms.
 
 use std::collections::{BTreeMap, HashMap};
-use std::convert::From;
 use std::error;
 use std::fmt;
 use std::io::{BufRead, BufReader, Cursor, Write};
@@ -17,18 +16,16 @@ use std::string::String;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use log::debug;
-
-use crate::proto::binarydef::{
-    Command, DataType, RequestHeader, RequestPacket, RequestPacketRef, ResponsePacket,
-};
-use crate::proto::{self, AuthResponse, MemCachedResult};
-use crate::proto::{
-    AuthOperation, CasOperation, MultiOperation, NoReplyOperation, Operation, ServerOperation,
-};
-
+use bytes::Bytes;
 use semver::Version;
 
-use rand::random;
+use crate::proto::{self, AuthResponse, MemCachedResult};
+use proto::binarydef::{
+    Command, DataType, RequestHeader, RequestPacket, RequestPacketRef, ResponsePacket
+};
+use proto::{
+    AuthOperation, CasOperation, MultiOperation, NoReplyOperation, Operation, ServerOperation,
+};
 
 pub use proto::binarydef::Status;
 
@@ -87,7 +84,7 @@ impl<T: BufRead + Write + Send> BinaryProto<T> {
     }
 
     fn send_noop(&mut self) -> MemCachedResult<u32> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!("Sending NOOP");
         let req_packet = RequestPacket::new(
             Command::Noop,
@@ -95,9 +92,9 @@ impl<T: BufRead + Write + Send> BinaryProto<T> {
             0,
             opaque,
             0,
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
+            Bytes::new(),
+            Bytes::new(),
+            Bytes::new(),
         );
 
         req_packet.write_to(&mut self.stream)?;
@@ -115,7 +112,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
         flags: u32,
         expiration: u32,
     ) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Set key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
             key,
@@ -168,7 +165,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
         flags: u32,
         expiration: u32,
     ) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Add key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
             key,
@@ -215,7 +212,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
     }
 
     fn delete(&mut self, key: &[u8]) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Delete key: {:?} {:?}",
             key,
@@ -258,7 +255,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
         flags: u32,
         expiration: u32,
     ) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Replace key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
             key,
@@ -305,7 +302,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
     }
 
     fn get(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32)> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Get key: {:?} {:?}",
             key,
@@ -340,14 +337,14 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
                 let mut extrabufr = BufReader::new(&resp.extra[..]);
                 let flags = extrabufr.read_u32::<BigEndian>()?;
 
-                Ok((resp.value, flags))
+                Ok((resp.value.to_vec(), flags))
             }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
     fn getk(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, Vec<u8>, u32)> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "GetK key: {:?} {:?}",
             key,
@@ -382,7 +379,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
                 let mut extrabufr = BufReader::new(&resp.extra[..]);
                 let flags = extrabufr.read_u32::<BigEndian>()?;
 
-                Ok((resp.key, resp.value, flags))
+                Ok((resp.key.to_vec(), resp.value.to_vec(), flags))
             }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
@@ -395,7 +392,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
         initial: u64,
         expiration: u32,
     ) -> MemCachedResult<u64> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Increment key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
             key,
@@ -452,7 +449,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
         initial: u64,
         expiration: u32,
     ) -> MemCachedResult<u64> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Decrement key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
             key,
@@ -503,7 +500,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
     }
 
     fn append(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Append key: {:?} {:?}, value: {:?}",
             key,
@@ -541,7 +538,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
     }
 
     fn prepend(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Prepend key: {:?} {:?}, value: {:?}",
             key,
@@ -579,7 +576,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
     }
 
     fn touch(&mut self, key: &[u8], expiration: u32) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Touch key: {:?} {:?}, expiration: {}",
             key,
@@ -625,7 +622,7 @@ impl<T: BufRead + Write + Send> Operation for BinaryProto<T> {
 
 impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
     fn quit(&mut self) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!("Quit");
         let req_header = RequestHeader::from_payload(
             Command::Quit,
@@ -658,7 +655,7 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
     }
 
     fn flush(&mut self, expiration: u32) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!("Expiration flush: {}", expiration);
         let mut extra = [0u8; 4];
         {
@@ -715,7 +712,7 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
     }
 
     fn version(&mut self) -> MemCachedResult<Version> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!("Version");
         let req_header =
             RequestHeader::new(Command::Version, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
@@ -761,7 +758,7 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
     }
 
     fn stat(&mut self) -> MemCachedResult<BTreeMap<String, String>> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!("Stat");
         let req_header =
             RequestHeader::new(Command::Stat, DataType::RawBytes, 0, opaque, 0, 0, 0, 0);
@@ -789,7 +786,7 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
                 break;
             }
 
-            let key = match String::from_utf8(resp.key) {
+            let key = match String::from_utf8(resp.key.to_vec()) {
                 Ok(k) => k,
                 Err(..) => {
                     return Err(proto::Error::OtherError {
@@ -799,7 +796,7 @@ impl<T: BufRead + Write + Send> ServerOperation for BinaryProto<T> {
                 }
             };
 
-            let val = match String::from_utf8(resp.value) {
+            let val = match String::from_utf8(resp.value.to_vec()) {
                 Ok(k) => k,
                 Err(..) => {
                     return Err(proto::Error::OtherError {
@@ -895,7 +892,7 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
         let opaques: MemCachedResult<HashMap<_, _>> = kv
             .into_iter()
             .map(|(key, (amount, initial, expiration))| {
-                let opaque = random::<u32>();
+                let opaque = fastrand::u32(..);
                 let mut extra = [0u8; 20];
                 {
                     let mut extra_buf = Cursor::new(&mut extra[..]);
@@ -979,7 +976,7 @@ impl<T: BufRead + Write + Send> MultiOperation for BinaryProto<T> {
             let mut extrabufr = BufReader::new(&resp.extra[..]);
             let flags = extrabufr.read_u32::<BigEndian>()?;
 
-            result.insert(resp.key, (resp.value, flags));
+            result.insert(resp.key.to_vec(), (resp.value.to_vec(), flags));
         }
     }
 }
@@ -992,7 +989,7 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
         flags: u32,
         expiration: u32,
     ) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Set noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
             key,
@@ -1033,7 +1030,7 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
         flags: u32,
         expiration: u32,
     ) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Add noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
             key,
@@ -1068,7 +1065,7 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
     }
 
     fn delete_noreply(&mut self, key: &[u8]) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Delete noreply key: {:?} {:?}",
             key,
@@ -1099,7 +1096,7 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
         flags: u32,
         expiration: u32,
     ) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Replace noreply key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
             key,
@@ -1140,7 +1137,7 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
         initial: u64,
         expiration: u32,
     ) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Increment noreply key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
             key,
@@ -1182,7 +1179,7 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
         initial: u64,
         expiration: u32,
     ) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Decrement noreply key: {:?} {:?}, amount: {}, initial: {}, expiration: {}",
             key,
@@ -1218,7 +1215,7 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
     }
 
     fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Append noreply key: {:?} {:?}, value: {:?}",
             key,
@@ -1244,7 +1241,7 @@ impl<T: BufRead + Write + Send> NoReplyOperation for BinaryProto<T> {
     }
 
     fn prepend_noreply(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Prepend noreply key: {:?} {:?}, value: {:?}",
             key,
@@ -1279,7 +1276,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
         expiration: u32,
         cas: u64,
     ) -> MemCachedResult<u64> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Set cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}, cas: {}",
             key,
@@ -1333,7 +1330,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
         flags: u32,
         expiration: u32,
     ) -> MemCachedResult<u64> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Add cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}",
             key,
@@ -1387,7 +1384,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
         expiration: u32,
         cas: u64,
     ) -> MemCachedResult<u64> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Replace cas key: {:?} {:?}, value: {:?}, flags: 0x{:x}, expiration: {}, cas: {}",
             key,
@@ -1435,7 +1432,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
     }
 
     fn get_cas(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32, u64)> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Get cas key: {:?} {:?}",
             key,
@@ -1470,14 +1467,14 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
                 let mut extrabufr = BufReader::new(&resp.extra[..]);
                 let flags = extrabufr.read_u32::<BigEndian>()?;
 
-                Ok((resp.value, flags, resp.header.cas))
+                Ok((resp.value.to_vec(), flags, resp.header.cas))
             }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
     }
 
     fn getk_cas(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, Vec<u8>, u32, u64)> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "GetK cas key: {:?} {:?}",
             key,
@@ -1512,7 +1509,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
                 let mut extrabufr = BufReader::new(&resp.extra[..]);
                 let flags = extrabufr.read_u32::<BigEndian>()?;
 
-                Ok((resp.key, resp.value, flags, resp.header.cas))
+                Ok((resp.key.to_vec(), resp.value.to_vec(), flags, resp.header.cas))
             }
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
         }
@@ -1526,7 +1523,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
         expiration: u32,
         cas: u64,
     ) -> MemCachedResult<(u64, u64)> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Increment cas key: {:?} {:?}, amount: {}, initial: {}, expiration: {}, cas: {}",
             key,
@@ -1585,7 +1582,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
         expiration: u32,
         cas: u64,
     ) -> MemCachedResult<(u64, u64)> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Decrement cas key: {:?} {:?}, amount: {}, initial: {}, expiration: {}, cas: {}",
             key,
@@ -1637,7 +1634,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
     }
 
     fn append_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> MemCachedResult<u64> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Append cas key: {:?} {:?}, value: {:?}, cas: {}",
             key,
@@ -1676,7 +1673,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
     }
 
     fn prepend_cas(&mut self, key: &[u8], value: &[u8], cas: u64) -> MemCachedResult<u64> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Prepend cas key: {:?} {:?}, value: {:?}, cas: {}",
             key,
@@ -1715,7 +1712,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
     }
 
     fn touch_cas(&mut self, key: &[u8], expiration: u32, cas: u64) -> MemCachedResult<u64> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!(
             "Touch cas key: {:?} {:?}, expiration: {:?}, cas: {}",
             key,
@@ -1762,7 +1759,7 @@ impl<T: BufRead + Write + Send> CasOperation for BinaryProto<T> {
 
 impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
     fn list_mechanisms(&mut self) -> MemCachedResult<Vec<String>> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!("List mechanisms");
         let req_header = RequestHeader::new(
             Command::SaslListMechanisms,
@@ -1802,7 +1799,7 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
     }
 
     fn auth_start(&mut self, mech: &str, init: &[u8]) -> MemCachedResult<AuthResponse> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!("Auth start, mechanism: {:?}, init: {:?}", mech, init);
         let req_header = RequestHeader::from_payload(
             Command::SaslAuthenticate,
@@ -1828,7 +1825,7 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
         }
 
         match resp.header.status {
-            Status::AuthenticationFurtherStepRequired => Ok(AuthResponse::Continue(resp.value)),
+            Status::AuthenticationFurtherStepRequired => Ok(AuthResponse::Continue(resp.value.to_vec())),
             Status::NoError => Ok(AuthResponse::Succeeded),
             Status::AuthenticationRequired => Ok(AuthResponse::Failed),
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
@@ -1836,7 +1833,7 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
     }
 
     fn auth_continue(&mut self, mech: &str, data: &[u8]) -> MemCachedResult<AuthResponse> {
-        let opaque = random::<u32>();
+        let opaque = fastrand::u32(..);
         debug!("Auth continue, mechanism: {:?}, data: {:?}", mech, data);
         let req_header = RequestHeader::from_payload(
             Command::SaslStep,
@@ -1862,7 +1859,7 @@ impl<T: BufRead + Write + Send> AuthOperation for BinaryProto<T> {
         }
 
         match resp.header.status {
-            Status::AuthenticationFurtherStepRequired => Ok(AuthResponse::Continue(resp.value)),
+            Status::AuthenticationFurtherStepRequired => Ok(AuthResponse::Continue(resp.value.to_vec())),
             Status::NoError => Ok(AuthResponse::Succeeded),
             Status::AuthenticationRequired => Ok(AuthResponse::Failed),
             _ => Err(From::from(Error::from_status(resp.header.status, None))),
