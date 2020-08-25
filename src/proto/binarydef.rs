@@ -41,6 +41,7 @@
 use std::io::{self, Read, Write};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use bytes::{Bytes, Buf, BytesMut};
 
 #[rustfmt::skip]
 mod consts {
@@ -601,9 +602,9 @@ impl ResponseHeader {
 #[derive(Clone, Debug)]
 pub struct RequestPacket {
     pub header: RequestHeader,
-    pub extra: Vec<u8>,
-    pub key: Vec<u8>,
-    pub value: Vec<u8>,
+    pub extra: Bytes,
+    pub key: Bytes,
+    pub value: Bytes,
 }
 
 impl RequestPacket {
@@ -613,9 +614,9 @@ impl RequestPacket {
         vbid: u16,
         opaque: u32,
         cas: u64,
-        extra: Vec<u8>,
-        key: Vec<u8>,
-        value: Vec<u8>,
+        extra: Bytes,
+        key: Bytes,
+        value: Bytes,
     ) -> RequestPacket {
         RequestPacket {
             header: RequestHeader::from_payload(
@@ -624,9 +625,9 @@ impl RequestPacket {
                 vbid,
                 opaque,
                 cas,
-                &key[..],
-                &extra[..],
-                &value[..],
+                key.bytes(),
+                extra.bytes(),
+                value.bytes(),
             ),
             extra,
             key,
@@ -637,9 +638,9 @@ impl RequestPacket {
     #[inline]
     pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         self.header.write_to(writer)?;
-        writer.write_all(&self.extra[..])?;
-        writer.write_all(&self.key[..])?;
-        writer.write_all(&self.value[..])?;
+        writer.write_all(self.extra.bytes())?;
+        writer.write_all(self.key.bytes())?;
+        writer.write_all(self.value.bytes())?;
 
         Ok(())
     }
@@ -650,31 +651,23 @@ impl RequestPacket {
 
         let extra_len = header.extra_len as usize;
         let key_len = header.key_len as usize;
-        let value_len = header.body_len as usize - extra_len - key_len;
+        let body_len =  header.body_len as usize;
 
-        let extra = {
-            let mut buf = Vec::with_capacity(extra_len as usize);
-            reader.take(extra_len as u64).read_to_end(&mut buf)?;
-            buf
-        };
+        let mut buf = BytesMut::with_capacity(body_len);
+        unsafe { buf.set_len(body_len); }
 
-        let key = {
-            let mut buf = Vec::with_capacity(key_len as usize);
-            reader.take(key_len as u64).read_to_end(&mut buf)?;
-            buf
-        };
-
-        let value = {
-            let mut buf = Vec::with_capacity(value_len as usize);
-            reader.take(value_len as u64).read_to_end(&mut buf)?;
-            buf
-        };
+        let mut extra = buf.split_to(extra_len);
+        let mut key = buf.split_to(key_len);
+        let mut value = buf;
+        reader.read_exact(extra.as_mut())?;
+        reader.read_exact(key.as_mut())?;
+        reader.read_exact(value.as_mut())?;
 
         Ok(RequestPacket {
             header,
-            extra,
-            key,
-            value,
+            extra: extra.freeze(),
+            key: key.freeze(),
+            value: value.freeze(),
         })
     }
 
@@ -725,9 +718,9 @@ impl<'a> RequestPacketRef<'a> {
 #[derive(Clone, Debug)]
 pub struct ResponsePacket {
     pub header: ResponseHeader,
-    pub extra: Vec<u8>,
-    pub key: Vec<u8>,
-    pub value: Vec<u8>,
+    pub extra: Bytes,
+    pub key: Bytes,
+    pub value: Bytes,
 }
 
 impl ResponsePacket {
@@ -737,9 +730,9 @@ impl ResponsePacket {
         status: Status,
         opaque: u32,
         cas: u64,
-        extra: Vec<u8>,
-        key: Vec<u8>,
-        value: Vec<u8>,
+        extra: Bytes,
+        key: Bytes,
+        value: Bytes,
     ) -> ResponsePacket {
         ResponsePacket {
             header: ResponseHeader::from_payload(
@@ -748,9 +741,9 @@ impl ResponsePacket {
                 status,
                 opaque,
                 cas,
-                &key[..],
-                &extra[..],
-                &value[..],
+                key.bytes(),
+                extra.bytes(),
+                value.bytes(),
             ),
             extra,
             key,
@@ -761,9 +754,9 @@ impl ResponsePacket {
     #[inline]
     pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         self.header.write_to(writer)?;
-        writer.write_all(&self.extra[..])?;
-        writer.write_all(&self.key[..])?;
-        writer.write_all(&self.value[..])?;
+        writer.write_all(self.extra.bytes())?;
+        writer.write_all(self.key.bytes())?;
+        writer.write_all(self.value.bytes())?;
 
         Ok(())
     }
@@ -774,31 +767,23 @@ impl ResponsePacket {
 
         let extra_len = header.extra_len as usize;
         let key_len = header.key_len as usize;
-        let value_len = header.body_len as usize - extra_len - key_len;
+        let body_len =  header.body_len as usize;
 
-        let extra = {
-            let mut buf = Vec::with_capacity(extra_len as usize);
-            reader.take(extra_len as u64).read_to_end(&mut buf)?;
-            buf
-        };
+        let mut buf = BytesMut::with_capacity(body_len);
+        unsafe { buf.set_len(body_len); }
 
-        let key = {
-            let mut buf = Vec::with_capacity(key_len as usize);
-            reader.take(key_len as u64).read_to_end(&mut buf)?;
-            buf
-        };
-
-        let value = {
-            let mut buf = Vec::with_capacity(value_len as usize);
-            reader.take(value_len as u64).read_to_end(&mut buf)?;
-            buf
-        };
+        let mut extra = buf.split_to(extra_len);
+        let mut key = buf.split_to(key_len);
+        let mut value = buf;
+        reader.read_exact(extra.as_mut())?;
+        reader.read_exact(key.as_mut())?;
+        reader.read_exact(value.as_mut())?;
 
         Ok(ResponsePacket {
             header,
-            extra,
-            key,
-            value,
+            extra: extra.freeze(),
+            key: key.freeze(),
+            value: value.freeze(),
         })
     }
 }
@@ -845,6 +830,7 @@ mod test {
     use crate::proto::binarydef::{Command, DataType, RequestPacket, ResponsePacket};
 
     use bufstream::BufStream;
+    use bytes::Bytes;
 
     fn test_stream() -> TcpStream {
         TcpStream::connect("127.0.0.1:11211").unwrap()
@@ -861,9 +847,9 @@ mod test {
                 0,
                 0,
                 0,
-                vec![0xde, 0xad, 0xbe, 0xef, 0x00, 0x00, 0x0e, 0x10],
-                b"test:binary_proto:hello".to_vec(),
-                b"world".to_vec(),
+                vec![0xde, 0xad, 0xbe, 0xef, 0x00, 0x00, 0x0e, 0x10].into(),
+                b"test:binary_proto:hello".as_ref().into(),
+                b"world".as_ref().into(),
             );
 
             req_packet.write_to(&mut stream).unwrap();
@@ -871,7 +857,7 @@ mod test {
 
             let resp_packet = ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == proto::binary::Status::NoError);
+            assert_eq!(resp_packet.header.status, proto::binary::Status::NoError);
         }
 
         {
@@ -881,9 +867,9 @@ mod test {
                 0,
                 0,
                 0,
-                vec![],
-                b"test:binary_proto:hello".to_vec(),
-                vec![],
+                Bytes::new(),
+                b"test:binary_proto:hello".as_ref().into(),
+                Bytes::new(),
             );
 
             req_packet.write_to(&mut stream).unwrap();
@@ -891,7 +877,7 @@ mod test {
 
             let resp_packet = ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == proto::binary::Status::NoError);
+            assert_eq!(resp_packet.header.status, proto::binary::Status::NoError);
             assert_eq!(&resp_packet.value[..], b"world");
         }
 
@@ -902,9 +888,9 @@ mod test {
                 0,
                 0,
                 0,
-                vec![],
-                b"test:binary_proto:hello".to_vec(),
-                vec![],
+                Bytes::new(),
+                b"test:binary_proto:hello".as_ref().into(),
+                Bytes::new(),
             );
 
             req_packet.write_to(&mut stream).unwrap();
@@ -912,7 +898,7 @@ mod test {
 
             let resp_packet = ResponsePacket::read_from(&mut stream).unwrap();
 
-            assert!(resp_packet.header.status == proto::binary::Status::NoError);
+            assert_eq!(resp_packet.header.status, proto::binary::Status::NoError);
         }
     }
 }

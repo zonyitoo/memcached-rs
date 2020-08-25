@@ -14,7 +14,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::io;
 use std::net::TcpStream;
 use std::ops::Deref;
-use std::path::Path;
 use std::rc::Rc;
 
 use conhash::{ConsistentHash, Node};
@@ -170,7 +169,7 @@ impl Client {
         Ok(Client { servers })
     }
 
-    fn find_server_by_key<'a>(&'a mut self, key: &[u8]) -> &'a mut ServerRef {
+    fn find_server_by_key(&mut self, key: &[u8]) -> &mut ServerRef {
         self.servers.get_mut(key).expect("No valid server found")
     }
 }
