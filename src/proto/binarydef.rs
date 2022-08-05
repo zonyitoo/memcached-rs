@@ -41,7 +41,7 @@
 use std::io::{self, Read, Write};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use bytes::{Bytes, Buf, BytesMut};
+use bytes::{Bytes, BytesMut};
 
 #[rustfmt::skip]
 mod consts {
@@ -625,9 +625,9 @@ impl RequestPacket {
                 vbid,
                 opaque,
                 cas,
-                key.bytes(),
-                extra.bytes(),
-                value.bytes(),
+                &key,
+                &extra,
+                &value,
             ),
             extra,
             key,
@@ -638,9 +638,9 @@ impl RequestPacket {
     #[inline]
     pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         self.header.write_to(writer)?;
-        writer.write_all(self.extra.bytes())?;
-        writer.write_all(self.key.bytes())?;
-        writer.write_all(self.value.bytes())?;
+        writer.write_all(&self.extra)?;
+        writer.write_all(&self.key)?;
+        writer.write_all(&self.value)?;
 
         Ok(())
     }
@@ -741,9 +741,9 @@ impl ResponsePacket {
                 status,
                 opaque,
                 cas,
-                key.bytes(),
-                extra.bytes(),
-                value.bytes(),
+                &key,
+                &extra,
+                &value,
             ),
             extra,
             key,
@@ -754,9 +754,9 @@ impl ResponsePacket {
     #[inline]
     pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         self.header.write_to(writer)?;
-        writer.write_all(self.extra.bytes())?;
-        writer.write_all(self.key.bytes())?;
-        writer.write_all(self.value.bytes())?;
+        writer.write_all(&self.extra)?;
+        writer.write_all(&self.key)?;
+        writer.write_all(&self.value)?;
 
         Ok(())
     }
