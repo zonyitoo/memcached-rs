@@ -12,7 +12,7 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::io;
-use std::net::TcpStream;
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::ops::Deref;
 use std::path::Path;
 use std::rc::Rc;
@@ -33,6 +33,12 @@ struct Sasl<'a> {
     password: &'a str,
 }
 
+struct ConnectOpts {
+    connect_timeout: Option<Duration>,
+    read_timeout: Option<Duration>,
+    write_timeout: Option<Duration>,
+}
+
 struct Server {
     pub proto: Box<dyn Proto + Send>,
     addr: String,
@@ -43,17 +49,25 @@ impl Server {
         addr: String,
         protocol: proto::ProtoType,
         o_sasl: &Option<Sasl>,
-        op_timeout: Option<Duration>,
+        connect_opts: &Option<ConnectOpts>,
     ) -> io::Result<Server> {
         let proto = {
             let mut split = addr.split("://");
             match protocol {
                 proto::ProtoType::Binary => match (split.next(), split.next()) {
                     (Some("tcp"), Some(addr)) => {
-                        let stream = TcpStream::connect(addr)?;
+                        let stream = match connect_opts.as_ref().and_then(|opts| opts.connect_timeout) {
+                            Some(timeout) => {
+                                let socket_addr: SocketAddr = addr.to_socket_addrs()?.next().unwrap();
+                                TcpStream::connect_timeout(&socket_addr, timeout)?
+                            }
+                            None => TcpStream::connect(addr)?,
+                        };
+                        if let Some(opts) = &connect_opts {
+                            stream.set_read_timeout(opts.read_timeout)?;
+                            stream.set_write_timeout(opts.write_timeout)?;
+                        }
                         stream.set_nodelay(true)?;
-                        stream.set_read_timeout(op_timeout)?;
-                        stream.set_write_timeout(op_timeout)?;
                         let mut proto =
                             Box::new(proto::BinaryProto::new(BufStream::new(stream))) as Box<dyn Proto + Send>;
                         if let Some(sasl) = o_sasl {
@@ -72,8 +86,10 @@ impl Server {
                     #[cfg(unix)]
                     (Some("unix"), Some(addr)) => {
                         let stream = UnixStream::connect(&Path::new(addr))?;
-                        stream.set_read_timeout(op_timeout)?;
-                        stream.set_write_timeout(op_timeout)?;
+                        if let Some(opts) = &connect_opts {
+                            stream.set_read_timeout(opts.read_timeout)?;
+                            stream.set_write_timeout(opts.write_timeout)?;
+                        }
                         Box::new(proto::BinaryProto::new(BufStream::new(stream))) as Box<dyn Proto + Send>
                     }
                     (Some(prot), _) => {
@@ -139,12 +155,33 @@ impl Client {
     /// as a array of tuples in this form
     ///
     /// `(address, weight)`.
-    pub fn connect<S: ToString>(
+    pub fn connect<S: ToString>(svrs: &[(S, usize)], p: proto::ProtoType) -> io::Result<Client> {
+        Client::conn(svrs, p, None, None)
+    }
+
+    /// Connect to Memcached servers with connect and/or IO timeouts
+    ///
+    /// This function accept multiple servers, servers information should be represented
+    /// as a array of tuples in this form
+    ///
+    /// `(address, weight)`.
+    pub fn connect_with_opts<S: ToString>(
         svrs: &[(S, usize)],
         p: proto::ProtoType,
-        op_timeout: Option<Duration>,
+        connect_timeout: Option<Duration>,
+        read_timeout: Option<Duration>,
+        write_timeout: Option<Duration>,
     ) -> io::Result<Client> {
-        Client::conn(svrs, p, None, op_timeout)
+        Client::conn(
+            svrs,
+            p,
+            None,
+            Some(ConnectOpts {
+                connect_timeout,
+                read_timeout,
+                write_timeout,
+            }),
+        )
     }
 
     /// Connect to Memcached servers that require SASL authentication
@@ -158,22 +195,48 @@ impl Client {
         p: proto::ProtoType,
         username: &str,
         password: &str,
-        op_timeout: Option<Duration>,
     ) -> io::Result<Client> {
-        Client::conn(svrs, p, Some(Sasl { username, password }), op_timeout)
+        Client::conn(svrs, p, Some(Sasl { username, password }), None)
+    }
+
+    /// Connect to Memcached servers that require SASL authentication with connect and/or I/O timeouts
+    ///
+    /// This function accept multiple servers, servers information should be represented
+    /// as a array of tuples in this form
+    ///
+    /// `(address, weight)`.
+    pub fn connect_sasl_with_opts<S: ToString>(
+        svrs: &[(S, usize)],
+        p: proto::ProtoType,
+        username: &str,
+        password: &str,
+        connect_timeout: Option<Duration>,
+        read_timeout: Option<Duration>,
+        write_timeout: Option<Duration>,
+    ) -> io::Result<Client> {
+        Client::conn(
+            svrs,
+            p,
+            Some(Sasl { username, password }),
+            Some(ConnectOpts {
+                connect_timeout,
+                read_timeout,
+                write_timeout,
+            }),
+        )
     }
 
     fn conn<S: ToString>(
         svrs: &[(S, usize)],
         p: proto::ProtoType,
         sasl: Option<Sasl>,
-        op_timeout: Option<Duration>,
+        opts: Option<ConnectOpts>,
     ) -> io::Result<Client> {
         assert!(!svrs.is_empty(), "Server list should not be empty");
 
         let mut servers = ConsistentHash::new();
         for (addr, weight) in svrs.iter() {
-            let svr = Server::connect(addr.to_string(), p, &sasl, op_timeout)?;
+            let svr = Server::connect(addr.to_string(), p, &sasl, &opts)?;
             servers.add(&ServerRef(Rc::new(RefCell::new(svr))), *weight);
         }
 
