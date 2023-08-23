@@ -430,11 +430,13 @@ impl CasOperation for Client {
 
 impl MultiOperation for Client {
     fn set_multi(&mut self, kv: BTreeMap<&[u8], (&[u8], u32, u32)>) -> MemCachedResult<()> {
+        assert!(kv.keys().len() > 1);
         assert_eq!(self.servers.len(), 1);
         let server = self.find_server_by_key(kv.keys().next().unwrap());
         server.borrow_mut().proto.set_multi(kv)
     }
     fn delete_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<()> {
+        assert!(keys.len() > 1);
         assert_eq!(self.servers.len(), 1);
         let server = self.find_server_by_key(keys[0]);
         server.borrow_mut().proto.delete_multi(keys)
@@ -443,11 +445,13 @@ impl MultiOperation for Client {
         &mut self,
         kv: HashMap<&'a [u8], (u64, u64, u32)>,
     ) -> MemCachedResult<HashMap<&'a [u8], u64>> {
+        assert!(kv.keys().len() > 1);
         assert_eq!(self.servers.len(), 1);
         let server = self.find_server_by_key(kv.keys().next().unwrap());
         server.borrow_mut().proto.increment_multi(kv)
     }
     fn get_multi(&mut self, keys: &[&[u8]]) -> MemCachedResult<HashMap<Vec<u8>, (Vec<u8>, u32)>> {
+        assert!(keys.len() > 1);
         assert_eq!(self.servers.len(), 1);
         let server = self.find_server_by_key(keys[0]);
         server.borrow_mut().proto.get_multi(keys)
@@ -455,7 +459,7 @@ impl MultiOperation for Client {
 }
 
 #[cfg(all(test, feature = "nightly"))]
-mod test {
+mod bench_test {
     use super::Client;
     use crate::proto::{NoReplyOperation, Operation, ProtoType};
     use test::Bencher;
@@ -562,5 +566,81 @@ mod test {
         let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
 
         b.iter(|| client.set_noreply(key, &val[..], 0, 2));
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Client;
+    use crate::proto::{ProtoType, MultiOperation};
+    use std::collections::{BTreeMap, HashMap};
+
+    #[test]
+    fn test_set_multi() {
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+
+        let mut data = BTreeMap::new();
+        data.insert(&b"test:set_multi_hello1"[..], (&b"world1"[..], 0xdead_beef, 120));
+        data.insert(&b"test:set_multi_hello2"[..], (&b"world2"[..], 0xdead_beef, 120));
+
+        client.set_multi(data).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_set_multi_panic_with_no_keys() {
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+        let data = BTreeMap::new();
+
+        client.set_multi(data).unwrap();
+    }
+
+    #[test]
+    fn test_delete_multi() {
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+
+        client.delete_multi(&[b"test:delete_multi_hello1", b"test:delete_multi_hello2"]).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_delete_multi_panic_with_no_keys() {
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+
+        client.delete_multi(&[]).unwrap();
+    }
+
+    #[test]
+    fn test_increment_multi() {
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+
+        let mut data = HashMap::new();
+        data.insert(&b"test:increment_multi_num1"[..], (10, 50, 120));
+        data.insert(&b"test:increment_multi_num2"[..], (20, 50, 120));
+
+        client.increment_multi(data).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_increment_multi_panic_with_no_keys() {
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+
+        client.increment_multi(HashMap::new()).unwrap();
+    }
+
+    #[test]
+    fn test_get_multi() {
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+
+        client.get_multi(&[b"test:get_multi_hello1", b"test:get_multi_hello2"]).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_get_multi_panic_with_no_keys() {
+        let mut client = Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary).unwrap();
+
+        client.get_multi(&[]).unwrap();
     }
 }
