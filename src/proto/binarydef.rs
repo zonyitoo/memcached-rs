@@ -549,9 +549,7 @@ impl ResponseHeader {
         let extra_len = extra.len() as u8;
         let body_len = (key.len() + extra.len() + value.len()) as u32;
 
-        ResponseHeader::new(
-            cmd, dtype, status, opaque, cas, key_len, extra_len, body_len,
-        )
+        ResponseHeader::new(cmd, dtype, status, opaque, cas, key_len, extra_len, body_len)
     }
 
     #[inline]
@@ -619,16 +617,7 @@ impl RequestPacket {
         value: Bytes,
     ) -> RequestPacket {
         RequestPacket {
-            header: RequestHeader::from_payload(
-                cmd,
-                dtype,
-                vbid,
-                opaque,
-                cas,
-                &key,
-                &extra,
-                &value,
-            ),
+            header: RequestHeader::from_payload(cmd, dtype, vbid, opaque, cas, &key, &extra, &value),
             extra,
             key,
             value,
@@ -651,10 +640,12 @@ impl RequestPacket {
 
         let extra_len = header.extra_len as usize;
         let key_len = header.key_len as usize;
-        let body_len =  header.body_len as usize;
+        let body_len = header.body_len as usize;
 
         let mut buf = BytesMut::with_capacity(body_len);
-        unsafe { buf.set_len(body_len); }
+        unsafe {
+            buf.set_len(body_len);
+        }
 
         let mut extra = buf.split_to(extra_len);
         let mut key = buf.split_to(key_len);
@@ -672,12 +663,7 @@ impl RequestPacket {
     }
 
     pub fn as_ref(&self) -> RequestPacketRef<'_> {
-        RequestPacketRef::new(
-            &self.header,
-            &self.extra[..],
-            &self.key[..],
-            &self.value[..],
-        )
+        RequestPacketRef::new(&self.header, &self.extra[..], &self.key[..], &self.value[..])
     }
 }
 
@@ -690,12 +676,7 @@ pub struct RequestPacketRef<'a> {
 }
 
 impl<'a> RequestPacketRef<'a> {
-    pub fn new(
-        header: &'a RequestHeader,
-        extra: &'a [u8],
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> RequestPacketRef<'a> {
+    pub fn new(header: &'a RequestHeader, extra: &'a [u8], key: &'a [u8], value: &'a [u8]) -> RequestPacketRef<'a> {
         RequestPacketRef {
             header,
             extra,
@@ -735,16 +716,7 @@ impl ResponsePacket {
         value: Bytes,
     ) -> ResponsePacket {
         ResponsePacket {
-            header: ResponseHeader::from_payload(
-                cmd,
-                dtype,
-                status,
-                opaque,
-                cas,
-                &key,
-                &extra,
-                &value,
-            ),
+            header: ResponseHeader::from_payload(cmd, dtype, status, opaque, cas, &key, &extra, &value),
             extra,
             key,
             value,
@@ -767,10 +739,12 @@ impl ResponsePacket {
 
         let extra_len = header.extra_len as usize;
         let key_len = header.key_len as usize;
-        let body_len =  header.body_len as usize;
+        let body_len = header.body_len as usize;
 
         let mut buf = BytesMut::with_capacity(body_len);
-        unsafe { buf.set_len(body_len); }
+        unsafe {
+            buf.set_len(body_len);
+        }
 
         let mut extra = buf.split_to(extra_len);
         let mut key = buf.split_to(key_len);
@@ -796,12 +770,7 @@ pub struct ResponsePacketRef<'a> {
 }
 
 impl<'a> ResponsePacketRef<'a> {
-    pub fn new(
-        header: &'a ResponseHeader,
-        extra: &'a [u8],
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> ResponsePacketRef<'a> {
+    pub fn new(header: &'a ResponseHeader, extra: &'a [u8], key: &'a [u8], value: &'a [u8]) -> ResponsePacketRef<'a> {
         ResponsePacketRef {
             header,
             extra,

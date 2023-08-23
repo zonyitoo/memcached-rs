@@ -20,16 +20,10 @@ fn main() {
     assert_eq!(&value[..], b"Bar");
     assert_eq!(flags, 0xdead_beef);
 
-    client
-        .set_noreply(b"key:dontreply", b"1", 0x00_00_00_01, 20)
-        .unwrap();
+    client.set_noreply(b"key:dontreply", b"1", 0x00_00_00_01, 20).unwrap();
 
-    let (_, cas_val) = client
-        .increment_cas(b"key:numerical", 10, 1, 20, 0)
-        .unwrap();
-    client
-        .increment_cas(b"key:numerical", 1, 1, 20, cas_val)
-        .unwrap();
+    let (_, cas_val) = client.increment_cas(b"key:numerical", 10, 1, 20, 0).unwrap();
+    client.increment_cas(b"key:numerical", 1, 1, 20, cas_val).unwrap();
 
     let mut handlers = Vec::new();
     for _ in 0..4 {
@@ -38,9 +32,7 @@ fn main() {
             let (_, _, mut cas) = client.get_cas(b"key:dontreply").unwrap();
             for _ in 0..100 {
                 debug!("Setting in {:?}", thread::current());
-                client
-                    .set_cas(b"key:dontreply", b"1", 0x00_10_01, 20, cas)
-                    .unwrap();
+                client.set_cas(b"key:dontreply", b"1", 0x00_10_01, 20, cas).unwrap();
                 cas = client.get_cas(b"key:dontreply").unwrap().2;
             }
         });

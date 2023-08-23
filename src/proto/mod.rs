@@ -32,10 +32,7 @@ pub enum ProtoType {
 pub enum Error {
     BinaryProtoError(binary::Error),
     IoError(io::Error),
-    OtherError {
-        desc: &'static str,
-        detail: Option<String>,
-    },
+    OtherError { desc: &'static str, detail: Option<String> },
 }
 
 pub type MemCachedResult<T> = Result<T, Error>;
@@ -77,73 +74,28 @@ pub trait Proto:
 }
 
 impl<T> Proto for T where
-    T: Operation
-        + MultiOperation
-        + ServerOperation
-        + NoReplyOperation
-        + CasOperation
-        + AuthOperation
+    T: Operation + MultiOperation + ServerOperation + NoReplyOperation + CasOperation + AuthOperation
 {
 }
 
 pub trait Operation {
-    fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32)
-        -> MemCachedResult<()>;
-    fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32)
-        -> MemCachedResult<()>;
+    fn set(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()>;
+    fn add(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()>;
     fn delete(&mut self, key: &[u8]) -> MemCachedResult<()>;
-    fn replace(
-        &mut self,
-        key: &[u8],
-        value: &[u8],
-        flags: u32,
-        expiration: u32,
-    ) -> MemCachedResult<()>;
+    fn replace(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()>;
     fn get(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32)>;
     fn getk(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, Vec<u8>, u32)>;
-    fn increment(
-        &mut self,
-        key: &[u8],
-        amount: u64,
-        initial: u64,
-        expiration: u32,
-    ) -> MemCachedResult<u64>;
-    fn decrement(
-        &mut self,
-        key: &[u8],
-        amount: u64,
-        initial: u64,
-        expiration: u32,
-    ) -> MemCachedResult<u64>;
+    fn increment(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64>;
+    fn decrement(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<u64>;
     fn append(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()>;
     fn prepend(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()>;
     fn touch(&mut self, key: &[u8], expiration: u32) -> MemCachedResult<()>;
 }
 
 pub trait CasOperation {
-    fn set_cas(
-        &mut self,
-        key: &[u8],
-        value: &[u8],
-        flags: u32,
-        expiration: u32,
-        cas: u64,
-    ) -> MemCachedResult<u64>;
-    fn add_cas(
-        &mut self,
-        key: &[u8],
-        value: &[u8],
-        flags: u32,
-        expiration: u32,
-    ) -> MemCachedResult<u64>;
-    fn replace_cas(
-        &mut self,
-        key: &[u8],
-        value: &[u8],
-        flags: u32,
-        expiration: u32,
-        cas: u64,
-    ) -> MemCachedResult<u64>;
+    fn set_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64>;
+    fn add_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<u64>;
+    fn replace_cas(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32, cas: u64) -> MemCachedResult<u64>;
     fn get_cas(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, u32, u64)>;
     fn getk_cas(&mut self, key: &[u8]) -> MemCachedResult<(Vec<u8>, Vec<u8>, u32, u64)>;
     fn increment_cas(
@@ -186,42 +138,12 @@ pub trait MultiOperation {
 }
 
 pub trait NoReplyOperation {
-    fn set_noreply(
-        &mut self,
-        key: &[u8],
-        value: &[u8],
-        flags: u32,
-        expiration: u32,
-    ) -> MemCachedResult<()>;
-    fn add_noreply(
-        &mut self,
-        key: &[u8],
-        value: &[u8],
-        flags: u32,
-        expiration: u32,
-    ) -> MemCachedResult<()>;
+    fn set_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()>;
+    fn add_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()>;
     fn delete_noreply(&mut self, key: &[u8]) -> MemCachedResult<()>;
-    fn replace_noreply(
-        &mut self,
-        key: &[u8],
-        value: &[u8],
-        flags: u32,
-        expiration: u32,
-    ) -> MemCachedResult<()>;
-    fn increment_noreply(
-        &mut self,
-        key: &[u8],
-        amount: u64,
-        initial: u64,
-        expiration: u32,
-    ) -> MemCachedResult<()>;
-    fn decrement_noreply(
-        &mut self,
-        key: &[u8],
-        amount: u64,
-        initial: u64,
-        expiration: u32,
-    ) -> MemCachedResult<()>;
+    fn replace_noreply(&mut self, key: &[u8], value: &[u8], flags: u32, expiration: u32) -> MemCachedResult<()>;
+    fn increment_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()>;
+    fn decrement_noreply(&mut self, key: &[u8], amount: u64, initial: u64, expiration: u32) -> MemCachedResult<()>;
     fn append_noreply(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()>;
     fn prepend_noreply(&mut self, key: &[u8], value: &[u8]) -> MemCachedResult<()>;
 }

@@ -18,14 +18,8 @@ fn main() {
     assert_eq!(&value[..], b"Bar");
     assert_eq!(flags, 0xdead_beef);
 
-    client
-        .set_noreply(b"key:dontreply", b"1", 0x00_00_00_01, 20)
-        .unwrap();
+    client.set_noreply(b"key:dontreply", b"1", 0x00_00_00_01, 20).unwrap();
 
-    let (_, cas_val) = client
-        .increment_cas(b"key:numerical", 10, 1, 20, 0)
-        .unwrap();
-    client
-        .increment_cas(b"key:numerical", 1, 1, 20, cas_val)
-        .unwrap();
+    let (_, cas_val) = client.increment_cas(b"key:numerical", 10, 1, 20, 0).unwrap();
+    client.increment_cas(b"key:numerical", 1, 1, 20, cas_val).unwrap();
 }
