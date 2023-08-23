@@ -1,6 +1,6 @@
 # memcached-rs
 
-[![Build Status](https://travis-ci.org/zonyitoo/memcached-rs.svg)](https://travis-ci.org/zonyitoo/memcached-rs)
+[![Build & Test](https://github.com/zonyitoo/memcached-rs/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/zonyitoo/memcached-rs/actions/workflows/build-and-test.yml)
 [![crates.io](https://img.shields.io/crates/v/memcached-rs.svg)](https://crates.io/crates/memcached-rs)
 [![dependency status](https://deps.rs/repo/github/zonyitoo/memcached-rs/status.svg)](https://deps.rs/repo/github/zonyitoo/memcached-rs)
 
